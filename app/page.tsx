@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { UserIcon } from "@heroicons/react/24/solid";
 
 type Booking = {
   id: string;
+  userId: string;
   user?: { name: string };
 };
 
@@ -12,6 +14,8 @@ type Overtime = {
   id: string;
   date: string;
   shift: string;
+  startTime: string;
+  endTime: string;
   requiredPeople: number;
   bookings: Booking[];
 };
@@ -24,12 +28,21 @@ const shiftStyles: Record<string, string> = {
 };
 
 export default function Home() {
+  const { data: session } = useSession();
   const [data, setData] = useState<Overtime[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    const res = await fetch("/api/overtime");
-    const json = await res.json();
-    setData(json);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/overtime");
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      console.error("Failed to load overtime:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -49,9 +62,25 @@ export default function Home() {
     <main className="p-4 max-w-md mx-auto space-y-4">
       <h1 className="text-2xl font-bold text-center">Overtime</h1>
 
+      {loading && (
+        <div className="text-center text-zinc-400">Loading...</div>
+      )}
+
+      {!loading && data.length === 0 && (
+        <div className="text-center text-zinc-400">No overtime available</div>
+      )}
+
       {data.map((ot) => {
         const booked = ot.bookings.length;
         const isFull = booked >= ot.requiredPeople;
+        
+        // CRITICAL BUSINESS RULE: User can always cancel their own booking
+        const userId = (session?.user as any)?.id;
+        const userBooking = ot.bookings.find((b) => b.userId === userId);
+        const hasMyBooking = !!userBooking;
+        
+        // Button is only disabled if shift is FULL AND user doesn't have a booking
+        const isButtonDisabled = isFull && !hasMyBooking;
 
         return (
           <div
@@ -70,20 +99,25 @@ export default function Home() {
               Date: {new Date(ot.date).toDateString()}
             </div>
 
-            {/* TIME (static for now) */}
+            {/* TIME */}
             <div className="text-sm text-zinc-300 mb-3">
-              Time: 07:00 – 19:00
+              Time: {ot.startTime} – {ot.endTime}
             </div>
 
             {/* SILHOUETTES */}
             <div className="flex gap-2 mb-2">
               {Array.from({ length: ot.requiredPeople }).map((_, i) => {
                 const filled = ot.bookings[i];
+                const isMe = filled?.userId === userId;
                 return (
                   <div
                     key={i}
                     className={`flex items-center gap-1 text-sm ${
-                      filled ? "text-white" : "text-zinc-500"
+                      isMe
+                        ? "text-blue-400 font-semibold"
+                        : filled
+                        ? "text-white"
+                        : "text-zinc-500"
                     }`}
                   >
                     <UserIcon className="w-5 h-5" />
@@ -105,15 +139,21 @@ export default function Home() {
 
             {/* ACTION */}
             <button
-              disabled={isFull}
+              disabled={isButtonDisabled}
               onClick={() => toggleBooking(ot.id)}
               className={`w-full py-2 rounded-lg font-semibold transition ${
-                isFull
+                isButtonDisabled
                   ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
+                  : hasMyBooking
+                  ? "bg-red-600 hover:bg-red-500"
                   : "bg-blue-600 hover:bg-blue-500"
               }`}
             >
-              {isFull ? "Fully Booked" : "Book / Cancel"}
+              {hasMyBooking
+                ? "Cancel My Booking"
+                : isFull
+                ? "Fully Booked"
+                : "Book Shift"}
             </button>
           </div>
         );

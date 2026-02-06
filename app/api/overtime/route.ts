@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -18,13 +19,13 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { overtimeId } = await req.json();
-
-  // TEMP USER until auth is wired
-  const user = await prisma.user.findFirst();
+  const { user, error } = await requireAuth();
+  if (error) return error;
   if (!user) {
-    return NextResponse.json({ error: "No users exist yet" }, { status: 400 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { overtimeId } = await req.json();
 
   const overtime = await prisma.overtimeRequest.findUnique({
     where: { id: overtimeId },

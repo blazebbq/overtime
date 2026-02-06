@@ -20,7 +20,7 @@ const handler = NextAuth({
           where: { email: credentials.email },
         });
 
-        if (!user || !user.isActive) {
+        if (!user) {
           return null;
         }
 
@@ -37,7 +37,7 @@ const handler = NextAuth({
           id: user.id,
           name: user.name,
           email: user.email,
-          isAdmin: user.isAdmin,
+          role: user.role,
         };
       },
     }),
@@ -47,6 +47,21 @@ const handler = NextAuth({
   },
   pages: {
     signIn: "/login",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = (user as any).role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as any).id = token.sub;
+        (session.user as any).role = token.role;
+      }
+      return session;
+    },
   },
 });
 
