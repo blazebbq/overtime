@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("USER") // USER | ADMIN
+  createdAt DateTime @default(now())
+
+  bookings  Booking[]
+}
+
+model OvertimeRequest {
+  id             String   @id @default(cuid())
+
+  // Core
+  date           DateTime
+  shift          String   // YELLOW | ORANGE | PURPLE | GREEN
+  startTime      String   // "07:00"
+  endTime        String   // "19:00"
+  requiredPeople Int
+
+  // Lifecycle
+  status         String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
+
+  createdAt      DateTime @default(now())
+
+  bookings       Booking[]
+}
+
+model Booking {
+  id         String   @id @default(cuid())
+  userId     String
+  overtimeId String
+  createdAt  DateTime @default(now())
+
+  user       User            @relation(fields: [userId], references: [id])
+  overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id])
+
+  @@unique([userId, overtimeId])
+}
