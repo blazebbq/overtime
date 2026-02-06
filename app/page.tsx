@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { UserIcon } from "@heroicons/react/24/solid";
+import Header from "./components/Header";
 
 type Booking = {
   id: string;
@@ -59,16 +60,16 @@ export default function Home() {
   };
 
   return (
-    <main className="p-4 max-w-md mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-center">Overtime</h1>
+    <>
+      <Header />
+      <main className="p-4 max-w-md mx-auto space-y-4">
+        {loading && (
+          <div className="text-center text-zinc-400">Loading...</div>
+        )}
 
-      {loading && (
-        <div className="text-center text-zinc-400">Loading...</div>
-      )}
-
-      {!loading && data.length === 0 && (
-        <div className="text-center text-zinc-400">No overtime available</div>
-      )}
+        {!loading && data.length === 0 && (
+          <div className="text-center text-zinc-400">No overtime available</div>
+        )}
 
       {data.map((ot) => {
         const booked = ot.bookings.length;
@@ -158,6 +159,7 @@ export default function Home() {
           </div>
         );
       })}
-    </main>
+      </main>
+    </>
   );
 }
