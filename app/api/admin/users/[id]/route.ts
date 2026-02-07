@@ -52,3 +52,45 @@ export async function PATCH(
     );
   }
 }
+
+// Delete user
+export async function DELETE(
+  req: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { user, error } = await requireAdmin();
+  if (error) return error;
+
+  const params = await context.params;
+
+  try {
+    // Prevent admin from deleting themselves
+    if (user && params.id === user.id) {
+      return NextResponse.json(
+        { error: "You cannot delete your own account" },
+        { status: 400 }
+      );
+    }
+
+    // Delete user's bookings first (cascade)
+    await prisma.booking.deleteMany({
+      where: { userId: params.id },
+    });
+
+    // Delete user
+    await prisma.user.delete({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    return NextResponse.json(
+      { error: "Failed to delete user" },
+      { status: 500 }
+    );
+  }
+}
