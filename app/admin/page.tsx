@@ -116,6 +116,31 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteUser = async (id: string, userName: string) => {
+    const confirmed = confirm(
+      `Are you sure you want to delete user "${userName}"? This action cannot be undone and will remove all their bookings.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to delete user");
+        return;
+      }
+
+      loadData();
+    } catch (err) {
+      console.error("Failed to delete user:", err);
+      alert("An error occurred while deleting the user");
+    }
+  };
+
   if (status === "loading" || loading) {
     return (
       <>
@@ -301,16 +326,26 @@ export default function AdminDashboard() {
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRoleToggle(user.id, user.role)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg font-semibold text-sm transition-colors ${
-                        user.role === "ADMIN"
-                          ? "bg-zinc-700 hover:bg-zinc-600 text-white"
-                          : "bg-purple-600 hover:bg-purple-500 text-white"
-                      }`}
-                    >
-                      {user.role === "ADMIN" ? "Demote to User" : "Make Admin"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRoleToggle(user.id, user.role)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-semibold text-sm transition-colors ${
+                          user.role === "ADMIN"
+                            ? "bg-zinc-700 hover:bg-zinc-600 text-white"
+                            : "bg-purple-600 hover:bg-purple-500 text-white"
+                        }`}
+                      >
+                        {user.role === "ADMIN" ? "Demote to User" : "Make Admin"}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id, user.name)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
+                        title="Delete User"
+                      >
+                        <XCircleIcon className="w-4 h-4" />
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -339,6 +374,13 @@ function CreateOvertimeForm({
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const shiftColors = [
+    { value: "YELLOW", label: "Yellow", color: "from-yellow-400 to-amber-500", textColor: "text-yellow-900" },
+    { value: "ORANGE", label: "Orange", color: "from-orange-400 to-red-500", textColor: "text-orange-900" },
+    { value: "PURPLE", label: "Purple", color: "from-purple-400 to-indigo-600", textColor: "text-purple-900" },
+    { value: "GREEN", label: "Green", color: "from-green-400 to-emerald-600", textColor: "text-green-900" },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,7 +418,7 @@ function CreateOvertimeForm({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Date
+              📅 Date
             </label>
             <input
               type="date"
@@ -385,32 +427,54 @@ function CreateOvertimeForm({
               onChange={(e) =>
                 setFormData({ ...formData, date: e.target.value })
               }
-              className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              min={new Date().toISOString().split('T')[0]}
+              className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Shift
+              👥 Required People
             </label>
-            <select
-              value={formData.shift}
+            <input
+              type="number"
+              min="1"
+              max="10"
+              required
+              value={formData.requiredPeople}
               onChange={(e) =>
-                setFormData({ ...formData, shift: e.target.value })
+                setFormData({ ...formData, requiredPeople: e.target.value })
               }
               className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="YELLOW">Yellow</option>
-              <option value="ORANGE">Orange</option>
-              <option value="PURPLE">Purple</option>
-              <option value="GREEN">Green</option>
-            </select>
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-3">
+            🎨 Shift Color
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {shiftColors.map((shift) => (
+              <button
+                key={shift.value}
+                type="button"
+                onClick={() => setFormData({ ...formData, shift: shift.value })}
+                className={`px-4 py-3 rounded-xl font-bold transition-all duration-200 bg-gradient-to-br ${shift.color} ${shift.textColor} ${
+                  formData.shift === shift.value
+                    ? "ring-4 ring-blue-500 scale-105 shadow-xl"
+                    : "opacity-70 hover:opacity-100 hover:scale-105"
+                }`}
+              >
+                {shift.label} Shift
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Start Time
+              🕐 Start Time
             </label>
             <input
               type="time"
@@ -424,7 +488,7 @@ function CreateOvertimeForm({
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              End Time
+              🕐 End Time
             </label>
             <input
               type="time"
@@ -436,23 +500,6 @@ function CreateOvertimeForm({
               className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Required People
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="10"
-            required
-            value={formData.requiredPeople}
-            onChange={(e) =>
-              setFormData({ ...formData, requiredPeople: e.target.value })
-            }
-            className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
         </div>
 
         {error && (
