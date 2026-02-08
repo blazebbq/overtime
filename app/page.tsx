@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { UserIcon } from "@heroicons/react/24/solid";
@@ -37,11 +37,6 @@ type Overtime = {
 
 // Convert hex color to tailwind-compatible gradient classes
 function getShiftStyles(hexColor: string): string {
-  const luminance = parseInt(hexColor.slice(1, 3), 16) * 0.299 +
-                   parseInt(hexColor.slice(3, 5), 16) * 0.587 +
-                   parseInt(hexColor.slice(5, 7), 16) * 0.114;
-  const isDark = luminance < 128;
-  
   return `border-2 shadow-2xl`;
 }
 
@@ -110,13 +105,7 @@ export default function Home() {
   }, [status]);
 
   // Load overtime when area or filters change
-  useEffect(() => {
-    if (selectedAreaId && status === "authenticated") {
-      load();
-    }
-  }, [selectedAreaId, availableOnly, myBookingsOnly, status]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!selectedAreaId) return;
     
     setLoading(true);
@@ -137,7 +126,13 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAreaId, availableOnly, myBookingsOnly]);
+
+  useEffect(() => {
+    if (selectedAreaId && status === "authenticated") {
+      load();
+    }
+  }, [selectedAreaId, status, load]);
 
   const toggleBooking = async (id: string) => {
     try {
