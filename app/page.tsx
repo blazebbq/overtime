@@ -89,13 +89,12 @@ export default function Home() {
     const loadAreas = async () => {
       setAreasLoading(true);
       try {
-        const res = await fetch("/api/admin/areas");
+        const res = await fetch("/api/areas");
         if (!res.ok) throw new Error("Failed to fetch areas");
         const json = await res.json();
-        const enabledAreas = json.filter((a: Area) => a.enabled);
-        setAreas(enabledAreas);
-        if (enabledAreas.length > 0) {
-          setSelectedAreaId(enabledAreas[0].id);
+        setAreas(json);
+        if (json.length > 0) {
+          setSelectedAreaId(json[0].id);
         }
       } catch (err) {
         console.error("Failed to load areas:", err);

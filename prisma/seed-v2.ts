@@ -138,7 +138,7 @@ async function main() {
   });
 
   const green = await prisma.shiftColour.create({
-    data: { name: "Green", hexColor: "#4ADE80", enabled: true },
+    data: { name: "Green", hexColor: "#34D399", enabled: true },
   });
 
   const blue = await prisma.shiftColour.create({
