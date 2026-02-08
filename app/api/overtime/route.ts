@@ -1,12 +1,30 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
-  const overtime = await prisma.overtimeRequest.findMany({
-    where: { status: { in: ["OPEN", "FULL"] } },
+export async function GET(req: NextRequest) {
+  const { user, error } = await requireAuth();
+  if (error) return error;
+
+  const searchParams = req.nextUrl.searchParams;
+  const areaId = searchParams.get("areaId");
+  const showAvailableOnly = searchParams.get("availableOnly") === "true";
+  const showMyBookingsOnly = searchParams.get("myBookingsOnly") === "true";
+
+  const where: any = {
+    status: { in: ["OPEN", "FULL"] },
+  };
+
+  if (areaId) {
+    where.areaId = areaId;
+  }
+
+  let overtime = await prisma.overtimeRequest.findMany({
+    where,
     orderBy: { date: "asc" },
     include: {
+      area: true,
+      shiftColour: true,
       bookings: {
         include: {
           user: { select: { id: true, name: true, email: true } },
@@ -14,6 +32,17 @@ export async function GET() {
       },
     },
   });
+
+  // Apply filters
+  if (showAvailableOnly) {
+    overtime = overtime.filter((ot) => ot.bookings.length < ot.requiredPeople);
+  }
+
+  if (showMyBookingsOnly && user) {
+    overtime = overtime.filter((ot) =>
+      ot.bookings.some((b) => b.userId === user.id)
+    );
+  }
 
   return NextResponse.json(overtime);
 }
@@ -64,6 +93,18 @@ export async function POST(req: Request) {
       },
     });
 
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "BOOKING_CANCELLED",
+        entityType: "Booking",
+        entityId: existingBooking.id,
+        creatorId: user.id,
+        affectedUserId: user.id,
+        changes: JSON.stringify({ overtimeId }),
+      },
+    });
+
     return NextResponse.json({ ok: true, action: "cancelled" });
   }
 
@@ -83,7 +124,7 @@ export async function POST(req: Request) {
   }
 
   // 4️⃣ CREATE BOOKING
-  await prisma.booking.create({
+  const booking = await prisma.booking.create({
     data: {
       userId: user.id,
       overtimeId,
@@ -97,6 +138,18 @@ export async function POST(req: Request) {
     data: {
       status:
         newCount >= overtime.requiredPeople ? "FULL" : "OPEN",
+    },
+  });
+
+  // Create audit log
+  await prisma.auditLog.create({
+    data: {
+      action: "BOOKING_CREATED",
+      entityType: "Booking",
+      entityId: booking.id,
+      creatorId: user.id,
+      affectedUserId: user.id,
+      changes: JSON.stringify({ overtimeId }),
     },
   });
 
