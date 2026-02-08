@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
+import { wouldCreateBreach } from "@/lib/consecutive-days";
 
 export async function GET(req: NextRequest) {
   const { user, error } = await requireAuth();
@@ -123,7 +124,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // 4️⃣ CREATE BOOKING
+  // 4️⃣ CHECK FOR CONSECUTIVE DAY BREACH (warning only, not blocking)
+  let breachWarning = false;
+  let consecutiveDays = 0;
+  try {
+    const breachCheck = await wouldCreateBreach(user.id, overtime.date);
+    breachWarning = breachCheck.wouldBreach;
+    consecutiveDays = breachCheck.consecutiveDaysAfter;
+  } catch (err) {
+    console.error("Failed to check consecutive days:", err);
+    // Continue with booking even if check fails
+  }
+
+  // 5️⃣ CREATE BOOKING
   const booking = await prisma.booking.create({
     data: {
       userId: user.id,
@@ -149,9 +162,18 @@ export async function POST(req: Request) {
       entityId: booking.id,
       creatorId: user.id,
       affectedUserId: user.id,
-      changes: JSON.stringify({ overtimeId }),
+      changes: JSON.stringify({ 
+        overtimeId, 
+        breachWarning, 
+        consecutiveDays 
+      }),
     },
   });
 
-  return NextResponse.json({ ok: true, action: "booked" });
+  return NextResponse.json({ 
+    ok: true, 
+    action: "booked",
+    breachWarning,
+    consecutiveDays,
+  });
 }
