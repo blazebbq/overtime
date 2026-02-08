@@ -41,22 +41,34 @@ function getShiftStyles(hexColor: string): string {
 }
 
 function getTextColor(hexColor: string): string {
+  // Validate hex color format
+  if (!hexColor || !/^#[0-9A-Fa-f]{6}$/.test(hexColor)) {
+    return "text-white"; // Default to white for invalid colors
+  }
+  
   const luminance = parseInt(hexColor.slice(1, 3), 16) * 0.299 +
                    parseInt(hexColor.slice(3, 5), 16) * 0.587 +
                    parseInt(hexColor.slice(5, 7), 16) * 0.114;
   return luminance < 128 ? "text-white" : "text-gray-900";
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function lightenColor(hex: string, percent: number): string {
+  // Validate hex color format
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    return hex; // Return original if invalid
+  }
+  
   const num = parseInt(hex.replace("#", ""), 16);
   const amt = Math.round(2.55 * percent);
-  const R = (num >> 16) + amt;
-  const G = (num >> 8 & 0x00FF) + amt;
-  const B = (num & 0x0000FF) + amt;
-  return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-    (B < 255 ? B < 1 ? 0 : B : 255))
-    .toString(16).slice(1);
+  const R = clamp((num >> 16) + amt, 0, 255);
+  const G = clamp((num >> 8 & 0x00FF) + amt, 0, 255);
+  const B = clamp((num & 0x0000FF) + amt, 0, 255);
+  
+  return "#" + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
 }
 
 export default function Home() {
