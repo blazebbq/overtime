@@ -9,7 +9,6 @@ import {
   UserGroupIcon,
   ClockIcon,
   ArchiveBoxIcon,
-  CheckCircleIcon,
   XCircleIcon,
 } from "@heroicons/react/24/solid";
 
@@ -19,20 +18,39 @@ type User = {
   name: string;
   role: string;
   createdAt: string;
-  bookings?: any[];
+  bookings?: unknown[];
 };
 
 type Overtime = {
   id: string;
   date: string;
-  shift: string;
   startTime: string;
   endTime: string;
   requiredPeople: number;
   status: string;
+  area: {
+    name: string;
+  };
+  shiftColour: {
+    name: string;
+    hexColour: string;
+  };
   bookings: Array<{
     user: { name: string; email: string };
   }>;
+};
+
+type Area = {
+  id: string;
+  name: string;
+  enabled: boolean;
+};
+
+type ShiftColour = {
+  id: string;
+  name: string;
+  hexColour: string;
+  areaId: string;
 };
 
 export default function AdminDashboard() {
@@ -54,8 +72,8 @@ export default function AdminDashboard() {
       return;
     }
 
-    const userRole = (session.user as any).role;
-    if (userRole !== "ADMIN") {
+    const userRole = (session.user as { role: string }).role;
+    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
       router.push("/");
       return;
     }
@@ -95,12 +113,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRoleToggle = async (id: string, currentRole: string) => {
-    const newRole = currentRole === "ADMIN" ? "USER" : "ADMIN";
+  const handleRoleChange = async (id: string, newRole: string) => {
     const confirmed = confirm(
-      `Change user role to ${newRole}? This will ${
-        newRole === "ADMIN" ? "grant" : "remove"
-      } admin access.`
+      `Change user role to ${newRole}?`
     );
     if (!confirmed) return;
 
@@ -218,8 +233,13 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
+                        <div
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: ot.shiftColour.hexColour }}
+                          title={ot.shiftColour.name}
+                        />
                         <span className="font-bold text-white text-lg">
-                          {ot.shift} Shift
+                          {ot.shiftColour.name} - {ot.area.name}
                         </span>
                         <span
                           className={`px-2 py-1 text-xs font-semibold rounded ${
@@ -308,8 +328,12 @@ export default function AdminDashboard() {
                         <span className="font-bold text-white">{user.name}</span>
                         <span
                           className={`px-2 py-1 text-xs font-semibold rounded ${
-                            user.role === "ADMIN"
+                            user.role === "SUPER_ADMIN"
+                              ? "bg-red-600 text-white"
+                              : user.role === "ADMIN"
                               ? "bg-purple-600 text-white"
+                              : user.role === "MANAGER"
+                              ? "bg-blue-600 text-white"
                               : "bg-zinc-700 text-zinc-300"
                           }`}
                         >
@@ -327,16 +351,16 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => handleRoleToggle(user.id, user.role)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg font-semibold text-sm transition-colors ${
-                          user.role === "ADMIN"
-                            ? "bg-zinc-700 hover:bg-zinc-600 text-white"
-                            : "bg-purple-600 hover:bg-purple-500 text-white"
-                        }`}
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                        className="px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        {user.role === "ADMIN" ? "Demote to User" : "Make Admin"}
-                      </button>
+                        <option value="USER">USER</option>
+                        <option value="MANAGER">MANAGER</option>
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                      </select>
                       <button
                         onClick={() => handleDeleteUser(user.id, user.name)}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
@@ -367,24 +391,69 @@ function CreateOvertimeForm({
 }) {
   const [formData, setFormData] = useState({
     date: "",
-    shift: "YELLOW",
+    areaId: "",
+    shiftColourId: "",
     startTime: "07:00",
     endTime: "19:00",
     requiredPeople: "2",
   });
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [shiftColours, setShiftColours] = useState<ShiftColour[]>([]);
+  const [filteredShiftColours, setFilteredShiftColours] = useState<ShiftColour[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const shiftColors = [
-    { value: "YELLOW", label: "Yellow", color: "from-yellow-400 to-amber-500", textColor: "text-yellow-900" },
-    { value: "ORANGE", label: "Orange", color: "from-orange-400 to-red-500", textColor: "text-orange-900" },
-    { value: "PURPLE", label: "Purple", color: "from-purple-400 to-indigo-600", textColor: "text-purple-900" },
-    { value: "GREEN", label: "Green", color: "from-green-400 to-emerald-600", textColor: "text-green-900" },
-  ];
+  useEffect(() => {
+    const loadAreasAndShiftColours = async () => {
+      try {
+        const [areasRes, shiftColoursRes] = await Promise.all([
+          fetch("/api/admin/areas"),
+          fetch("/api/admin/shift-colours"),
+        ]);
+
+        if (!areasRes.ok || !shiftColoursRes.ok) {
+          setError("Failed to load areas or shift colours");
+          return;
+        }
+
+        const areasData = await areasRes.json();
+        const shiftColoursData = await shiftColoursRes.json();
+
+        setAreas(areasData.filter((a: Area) => a.enabled));
+        setShiftColours(shiftColoursData);
+      } catch {
+        setError("An error occurred while loading data");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    loadAreasAndShiftColours();
+  }, []);
+
+  useEffect(() => {
+    if (formData.areaId) {
+      const filtered = shiftColours.filter(sc => sc.areaId === formData.areaId);
+      setFilteredShiftColours(filtered);
+      if (!filtered.find(sc => sc.id === formData.shiftColourId)) {
+        setFormData(prev => ({ ...prev, shiftColourId: "" }));
+      }
+    } else {
+      setFilteredShiftColours([]);
+      setFormData(prev => ({ ...prev, shiftColourId: "" }));
+    }
+  }, [formData.areaId, formData.shiftColourId, shiftColours]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!formData.areaId || !formData.shiftColourId) {
+      setError("Please select both area and shift colour");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -402,12 +471,20 @@ function CreateOvertimeForm({
       }
 
       onSuccess();
-    } catch (err) {
+    } catch {
       setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  if (loadingData) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+        <div className="text-center text-zinc-400 py-8">Loading areas and shift colours...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
@@ -450,26 +527,59 @@ function CreateOvertimeForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-3">
-            🎨 Shift Color
+          <label className="block text-sm font-medium text-zinc-300 mb-2">
+            🏢 Area
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            {shiftColors.map((shift) => (
-              <button
-                key={shift.value}
-                type="button"
-                onClick={() => setFormData({ ...formData, shift: shift.value })}
-                className={`px-4 py-3 rounded-xl font-bold transition-all duration-200 bg-gradient-to-br ${shift.color} ${shift.textColor} ${
-                  formData.shift === shift.value
-                    ? "ring-4 ring-blue-500 scale-105 shadow-xl"
-                    : "opacity-70 hover:opacity-100 hover:scale-105"
-                }`}
-              >
-                {shift.label} Shift
-              </button>
+          <select
+            required
+            value={formData.areaId}
+            onChange={(e) =>
+              setFormData({ ...formData, areaId: e.target.value })
+            }
+            className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select an area</option>
+            {areas.map((area) => (
+              <option key={area.id} value={area.id}>
+                {area.name}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
+
+        {formData.areaId && (
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-3">
+              🎨 Shift Colour
+            </label>
+            {filteredShiftColours.length === 0 ? (
+              <div className="text-sm text-zinc-400 py-2">
+                No shift colours available for this area
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {filteredShiftColours.map((shiftColour) => (
+                  <button
+                    key={shiftColour.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, shiftColourId: shiftColour.id })}
+                    className={`px-4 py-3 rounded-xl font-bold transition-all duration-200 ${
+                      formData.shiftColourId === shiftColour.id
+                        ? "ring-4 ring-blue-500 scale-105 shadow-xl"
+                        : "opacity-70 hover:opacity-100 hover:scale-105"
+                    }`}
+                    style={{
+                      backgroundColor: shiftColour.hexColour,
+                      color: parseInt(shiftColour.hexColour.slice(1), 16) > 0xffffff / 2 ? '#000' : '#fff'
+                    }}
+                  >
+                    {shiftColour.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -566,7 +676,7 @@ function CreateUserForm({
       }
 
       onSuccess();
-    } catch (err) {
+    } catch {
       setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
@@ -635,7 +745,9 @@ function CreateUserForm({
             className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="USER">User</option>
+            <option value="MANAGER">Manager</option>
             <option value="ADMIN">Admin</option>
+            <option value="SUPER_ADMIN">Super Admin</option>
           </select>
         </div>
 
