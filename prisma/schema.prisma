@@ -12,10 +12,90 @@ model User {
   email     String   @unique
   name      String
   password  String
-  role      String   @default("USER") // USER | ADMIN
+  role      String   @default("USER") // USER | ADMIN | MANAGER | SUPER_ADMIN
   createdAt DateTime @default(now())
 
-  bookings  Booking[]
+  // Relations
+  bookings           Booking[]
+  shiftPattern       UserShiftPattern?
+  managedUsers       ManagerAssignment[] @relation("ManagedUsers")
+  managers           ManagerAssignment[] @relation("Managers")
+  createdAuditLogs   AuditLog[]          @relation("AuditLogCreator")
+  affectedAuditLogs  AuditLog[]          @relation("AuditLogAffected")
+}
+
+model Area {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g. "SWC2", "SWC4", "SMC2"
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relations
+  shiftColours       AreaShiftColour[]
+  overtimeRequests   OvertimeRequest[]
+  managerAssignments ManagerAssignment[]
+}
+
+model ShiftColour {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g. "Yellow", "Blue", "Red", "Green", "Purple"
+  hexColor  String   // e.g. "#FFD700"
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relations
+  areas              AreaShiftColour[]
+  overtimeRequests   OvertimeRequest[]
+  managerAssignments ManagerAssignment[]
+}
+
+model AreaShiftColour {
+  id            String @id @default(cuid())
+  areaId        String
+  shiftColourId String
+
+  area        Area        @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  shiftColour ShiftColour @relation(fields: [shiftColourId], references: [id], onDelete: Cascade)
+
+  @@unique([areaId, shiftColourId])
+}
+
+model ShiftPattern {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g. "7-Day Pattern A", "14-Day Pattern B"
+  cycleLength Int      // Number of days in the pattern (7, 14, 28, etc.)
+  patternData String   // JSON string: {"days": [true, true, true, false, false, true, true]} - true = work day
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userAssignments UserShiftPattern[]
+}
+
+model UserShiftPattern {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  shiftPatternId String
+  startDate      DateTime // The date from which this pattern applies
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftPattern ShiftPattern @relation(fields: [shiftPatternId], references: [id])
+}
+
+model ManagerAssignment {
+  id            String  @id @default(cuid())
+  managerId     String  // User with MANAGER role
+  userId        String  // User being managed
+  areaId        String?
+  shiftColourId String?
+
+  manager      User         @relation("Managers", fields: [managerId], references: [id], onDelete: Cascade)
+  user         User         @relation("ManagedUsers", fields: [userId], references: [id], onDelete: Cascade)
+  area         Area?        @relation(fields: [areaId], references: [id])
+  shiftColour  ShiftColour? @relation(fields: [shiftColourId], references: [id])
+
+  @@unique([managerId, userId, areaId, shiftColourId])
 }
 
 model OvertimeRequest {
@@ -23,7 +103,8 @@ model OvertimeRequest {
 
   // Core
   date           DateTime
-  shift          String   // YELLOW | ORANGE | PURPLE | GREEN
+  areaId         String
+  shiftColourId  String
   startTime      String   // "07:00"
   endTime        String   // "19:00"
   requiredPeople Int
@@ -33,7 +114,11 @@ model OvertimeRequest {
 
   createdAt      DateTime @default(now())
 
+  // Relations
+  area           Area         @relation(fields: [areaId], references: [id])
+  shiftColour    ShiftColour  @relation(fields: [shiftColourId], references: [id])
   bookings       Booking[]
+  approvals      OvertimeApproval[]
 }
 
 model Booking {
@@ -42,8 +127,46 @@ model Booking {
   overtimeId String
   createdAt  DateTime @default(now())
 
-  user       User            @relation(fields: [userId], references: [id])
-  overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id])
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, overtimeId])
+}
+
+model OvertimeApproval {
+  id              String    @id @default(cuid())
+  overtimeId      String
+  userId          String    // User who worked the overtime
+  approverId      String    // Manager who approved
+  status          String    // PENDING | APPROVED | DECLINED
+  
+  // Hours worked
+  workedAsScheduled Boolean @default(true)
+  actualStartTime   String? // Only if workedAsScheduled = false
+  actualEndTime     String? // Only if workedAsScheduled = false
+  comment           String? // Optional manager comment
+  
+  // Flags
+  breachWarning     Boolean @default(false) // Consecutive day limit breach
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  overtime        OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
+
+  @@unique([overtimeId, userId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // e.g. "APPROVAL_CREATED", "OVERTIME_APPROVED", "USER_ROLE_CHANGED"
+  entityType  String   // e.g. "OvertimeApproval", "User", "OvertimeRequest"
+  entityId    String   // ID of the affected entity
+  creatorId   String   // User who made the change
+  affectedUserId String? // User affected by the change (if applicable)
+  changes     String   // JSON string of changes made
+  createdAt   DateTime @default(now())
+
+  creator       User  @relation("AuditLogCreator", fields: [creatorId], references: [id])
+  affectedUser  User? @relation("AuditLogAffected", fields: [affectedUserId], references: [id])
 }
