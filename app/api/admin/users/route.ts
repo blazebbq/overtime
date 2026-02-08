@@ -21,7 +21,11 @@ export async function GET() {
             overtime: {
               select: {
                 date: true,
-                shift: true,
+                shiftColour: {
+                  select: {
+                    name: true,
+                  }
+                },
               },
             },
           },

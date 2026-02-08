@@ -9,10 +9,10 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { date, shift, startTime, endTime, requiredPeople } = body;
+    const { date, areaId, shiftColourId, startTime, endTime, requiredPeople } = body;
 
     // Validation
-    if (!date || !shift || !startTime || !endTime || !requiredPeople) {
+    if (!date || !areaId || !shiftColourId || !startTime || !endTime || !requiredPeople) {
       return NextResponse.json(
         { error: "All fields are required" },
         { status: 400 }
@@ -26,10 +26,43 @@ export async function POST(req: Request) {
       );
     }
 
-    const validShifts = ["YELLOW", "ORANGE", "PURPLE", "GREEN"];
-    if (!validShifts.includes(shift)) {
+    // Verify area exists and is enabled
+    const area = await prisma.area.findUnique({
+      where: { id: areaId },
+    });
+
+    if (!area) {
       return NextResponse.json(
-        { error: "Invalid shift type" },
+        { error: "Invalid area" },
+        { status: 400 }
+      );
+    }
+
+    // Verify shift colour exists and is enabled
+    const shiftColour = await prisma.shiftColour.findUnique({
+      where: { id: shiftColourId },
+    });
+
+    if (!shiftColour) {
+      return NextResponse.json(
+        { error: "Invalid shift colour" },
+        { status: 400 }
+      );
+    }
+
+    // Verify the shift colour is available for this area
+    const areaShiftColour = await prisma.areaShiftColour.findUnique({
+      where: {
+        areaId_shiftColourId: {
+          areaId,
+          shiftColourId,
+        },
+      },
+    });
+
+    if (!areaShiftColour) {
+      return NextResponse.json(
+        { error: "This shift colour is not available for the selected area" },
         { status: 400 }
       );
     }
@@ -37,11 +70,30 @@ export async function POST(req: Request) {
     const overtime = await prisma.overtimeRequest.create({
       data: {
         date: new Date(date),
-        shift,
+        areaId,
+        shiftColourId,
         startTime,
         endTime,
         requiredPeople: parseInt(requiredPeople),
         status: "OPEN",
+      },
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "OVERTIME_CREATED",
+        entityType: "OvertimeRequest",
+        entityId: overtime.id,
+        creatorId: user!.id,
+        changes: JSON.stringify({
+          date,
+          areaId,
+          shiftColourId,
+          startTime,
+          endTime,
+          requiredPeople,
+        }),
       },
     });
 
@@ -64,6 +116,8 @@ export async function GET() {
     const overtime = await prisma.overtimeRequest.findMany({
       orderBy: { date: "desc" },
       include: {
+        area: true,
+        shiftColour: true,
         bookings: {
           include: {
             user: { select: { id: true, name: true, email: true } },
