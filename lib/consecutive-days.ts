@@ -3,7 +3,7 @@
  * Based on shift patterns and overtime bookings
  */
 
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 interface WorkDayCalculation {
   consecutiveDays: number;

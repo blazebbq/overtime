@@ -60,7 +60,6 @@ export async function POST(
         shiftColourId,
         areaId,
       })),
-      skipDuplicates: true,
     });
 
     // Create audit log
