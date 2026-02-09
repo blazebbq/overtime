@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowRightOnRectangleIcon, UserCircleIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
+import { ArrowRightOnRectangleIcon, UserCircleIcon, Cog6ToothIcon, CalendarIcon } from "@heroicons/react/24/solid";
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -38,6 +38,7 @@ export default function Header() {
   const user = session.user;
   const userRole = (user as any).role;
   const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const isManager = userRole === "MANAGER" || isAdmin;
   const isSuperAdmin = userRole === "SUPER_ADMIN";
 
   return (
@@ -67,7 +68,22 @@ export default function Header() {
                 ADMIN
               </span>
             )}
+            {isManager && !isAdmin && (
+              <span className="ml-2 px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded">
+                MANAGER
+              </span>
+            )}
           </div>
+
+          {/* User Dashboard */}
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors text-sm"
+            title="My Overtime Dashboard"
+          >
+            <CalendarIcon className="w-5 h-5" />
+            <span className="hidden sm:inline">My Overtime</span>
+          </button>
 
           <button
             onClick={() => router.push("/settings")}
@@ -92,7 +108,7 @@ export default function Header() {
               onClick={() => router.push("/admin")}
               className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold transition-colors text-sm"
             >
-              Dashboard
+              Admin
             </button>
           )}
 

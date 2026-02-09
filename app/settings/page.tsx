@@ -4,27 +4,43 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import Header from "../components/Header";
-import { UserCircleIcon, LockClosedIcon, CheckCircleIcon } from "@heroicons/react/24/solid";
+import { UserCircleIcon, LockClosedIcon, CheckCircleIcon, EnvelopeIcon } from "@heroicons/react/24/solid";
 
 export default function SettingsPage() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const [name, setName] = useState("");
+  const [secondaryEmail, setSecondaryEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
-    if (session?.user?.name) {
-      setName(session.user.name);
+    if (status === "authenticated") {
+      loadProfile();
     }
-  }, [status, session, router]);
+  }, [status, router]);
+
+  const loadProfile = async () => {
+    try {
+      const res = await fetch("/api/user/profile");
+      if (!res.ok) throw new Error("Failed to load profile");
+      const data = await res.json();
+      setName(data.name || "");
+      setSecondaryEmail(data.secondaryEmail || "");
+    } catch (err) {
+      console.error("Failed to load profile:", err);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,8 +64,10 @@ export default function SettingsPage() {
         body.currentPassword = currentPassword;
         body.newPassword = newPassword;
       }
+      // Secondary email can be set, updated, or removed (empty string)
+      body.secondaryEmail = secondaryEmail || null;
 
-      if (!body.name && !body.newPassword) {
+      if (!body.name && !body.newPassword && body.secondaryEmail === undefined) {
         setError("No changes to save");
         setLoading(false);
         return;
@@ -86,7 +104,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (status === "loading") {
+  if (status === "loading" || profileLoading) {
     return (
       <>
         <Header />
@@ -133,7 +151,7 @@ export default function SettingsPage() {
               
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-2">
-                  Email (cannot be changed)
+                  Primary Email (cannot be changed)
                 </label>
                 <input
                   id="email"
@@ -156,6 +174,34 @@ export default function SettingsPage() {
                   required
                   className="w-full px-4 py-3 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+              </div>
+            </div>
+
+            {/* Email Notifications */}
+            <div className="space-y-4 pt-6 border-t border-zinc-800">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <EnvelopeIcon className="w-6 h-6 text-zinc-400" />
+                Email Notifications
+              </h2>
+              <p className="text-sm text-zinc-400">
+                Add a secondary email to receive notifications at multiple addresses
+              </p>
+
+              <div>
+                <label htmlFor="secondaryEmail" className="block text-sm font-medium text-zinc-300 mb-2">
+                  Secondary Email (Optional)
+                </label>
+                <input
+                  id="secondaryEmail"
+                  type="email"
+                  value={secondaryEmail}
+                  onChange={(e) => setSecondaryEmail(e.target.value)}
+                  placeholder="e.g., personal@example.com"
+                  className="w-full px-4 py-3 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="mt-2 text-xs text-zinc-500">
+                  Overtime notifications will be sent to both your primary and secondary email addresses
+                </p>
               </div>
             </div>
 
