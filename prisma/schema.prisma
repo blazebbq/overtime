@@ -8,15 +8,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("USER") // USER | ADMIN | MANAGER | SUPER_ADMIN
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  email          String   @unique
+  secondaryEmail String?  // Optional secondary email for notifications
+  name           String
+  password       String
+  role           String   @default("USER") // USER | ADMIN | MANAGER | SUPER_ADMIN
+  createdAt      DateTime @default(now())
 
   // Relations
   bookings           Booking[]
+  applications       OvertimeApplication[]
   shiftPattern       UserShiftPattern?
   managedUsers       ManagerAssignment[] @relation("ManagedUsers")
   managers           ManagerAssignment[] @relation("Managers")
@@ -108,6 +110,7 @@ model OvertimeRequest {
   startTime      String   // "07:00"
   endTime        String   // "19:00"
   requiredPeople Int
+  approvedCount  Int      @default(0) // Number of approved applications
 
   // Lifecycle
   status         String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
@@ -118,6 +121,7 @@ model OvertimeRequest {
   area           Area         @relation(fields: [areaId], references: [id])
   shiftColour    ShiftColour  @relation(fields: [shiftColourId], references: [id])
   bookings       Booking[]
+  applications   OvertimeApplication[]
   approvals      OvertimeApproval[]
 }
 
@@ -131,6 +135,37 @@ model Booking {
   overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, overtimeId])
+}
+
+model OvertimeApplication {
+  id                 String    @id @default(cuid())
+  userId             String
+  overtimeId         String
+  
+  // Application type and details
+  requestType        String    // FULL | PARTIAL
+  requestedStartTime String?   // Required for PARTIAL, null for FULL
+  requestedEndTime   String?   // Required for PARTIAL, null for FULL
+  comment            String?   // Optional user comment
+  
+  // Approval status
+  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED_MANUAL | REJECTED_CAPACITY
+  
+  // Approval details (filled when status changes)
+  approvedStartTime  String?   // Manager-approved start time
+  approvedEndTime    String?   // Manager-approved end time
+  approverId         String?   // Manager who approved/rejected
+  rejectionReason    String?   // Reason if rejected manually
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  // Relations
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overtime           OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, overtimeId])
+  @@index([overtimeId, status])
 }
 
 model OvertimeApproval {
