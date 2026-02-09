@@ -9,8 +9,10 @@ export async function GET(req: NextRequest) {
 
   const searchParams = req.nextUrl.searchParams;
   const areaId = searchParams.get("areaId");
+  const shiftColourId = searchParams.get("shiftColourId");
   const showAvailableOnly = searchParams.get("availableOnly") === "true";
   const showMyBookingsOnly = searchParams.get("myBookingsOnly") === "true";
+  const showMyApplicationsOnly = searchParams.get("myApplicationsOnly") === "true";
 
   const where: any = {
     status: { in: ["OPEN", "FULL"] },
@@ -18,6 +20,10 @@ export async function GET(req: NextRequest) {
 
   if (areaId) {
     where.areaId = areaId;
+  }
+
+  if (shiftColourId) {
+    where.shiftColourId = shiftColourId;
   }
 
   let overtime = await prisma.overtimeRequest.findMany({
@@ -31,17 +37,31 @@ export async function GET(req: NextRequest) {
           user: { select: { id: true, name: true, email: true } },
         },
       },
+      applications: {
+        where: {
+          status: "APPROVED",
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
     },
   });
 
-  // Apply filters
+  // Apply filters based on approvedCount (new model)
   if (showAvailableOnly) {
-    overtime = overtime.filter((ot) => ot.bookings.length < ot.requiredPeople);
+    overtime = overtime.filter((ot) => ot.approvedCount < ot.requiredPeople);
   }
 
   if (showMyBookingsOnly && user) {
     overtime = overtime.filter((ot) =>
       ot.bookings.some((b) => b.userId === user.id)
+    );
+  }
+
+  if (showMyApplicationsOnly && user) {
+    overtime = overtime.filter((ot) =>
+      ot.applications.some((app) => app.userId === user.id)
     );
   }
 
