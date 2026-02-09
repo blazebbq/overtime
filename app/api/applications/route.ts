@@ -11,7 +11,10 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const overtimeId = searchParams.get("overtimeId");
 
-    const where: any = {
+    const where: {
+      userId: string;
+      overtimeId?: string;
+    } = {
       userId: user!.id,
     };
 

@@ -14,7 +14,11 @@ export async function GET(req: NextRequest) {
   const showMyBookingsOnly = searchParams.get("myBookingsOnly") === "true";
   const showMyApplicationsOnly = searchParams.get("myApplicationsOnly") === "true";
 
-  const where: any = {
+  const where: {
+    status: { in: string[] };
+    areaId?: string;
+    shiftColourId?: string;
+  } = {
     status: { in: ["OPEN", "FULL"] },
   };
 

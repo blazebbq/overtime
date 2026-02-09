@@ -181,7 +181,13 @@ export default function AvailableOvertimePage() {
     setError(null);
 
     try {
-      const body: any = {
+      const body: {
+        overtimeId: string;
+        requestType: string;
+        requestedStartTime?: string;
+        requestedEndTime?: string;
+        comment?: string;
+      } = {
         overtimeId: selectedOvertimeId,
         requestType: applicationType,
       };
@@ -210,9 +216,10 @@ export default function AvailableOvertimePage() {
       closeApplicationModal();
       loadOvertime();
       alert("Application submitted successfully! You will receive an email when it's reviewed.");
-    } catch (err: any) {
-      console.error("Failed to submit application:", err);
-      setError(err.message || "Failed to submit application");
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Failed to submit application:", error);
+      setError(error.message || "Failed to submit application");
     } finally {
       setSubmitting(false);
     }
@@ -293,7 +300,7 @@ export default function AvailableOvertimePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {overtime.map((ot) => {
-            const userId = (session?.user as any)?.id;
+            const userId = (session?.user as { id?: string })?.id;
             const userApplication = ot.applications.find(app => app.userId === userId);
             const hasApplied = !!userApplication;
             const isFull = ot.approvedCount >= ot.requiredPeople;

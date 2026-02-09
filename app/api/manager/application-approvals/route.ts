@@ -29,7 +29,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Build query for applications
-    const whereClause: any = {
+    const whereClause: {
+      userId: { in: string[] };
+      status?: string;
+    } = {
       userId: {
         in: managerAssignments.map((ma) => ma.userId),
       },

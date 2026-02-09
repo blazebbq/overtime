@@ -109,7 +109,11 @@ export async function PATCH(req: Request) {
     }
 
     // Prepare update data
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      password?: string;
+      secondaryEmail?: string | null;
+    } = {};
     if (name) {
       updateData.name = name;
     }

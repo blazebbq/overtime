@@ -36,7 +36,7 @@ export default function Header() {
   }
 
   const user = session.user;
-  const userRole = (user as any).role;
+  const userRole = (user as { role?: string }).role;
   const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const isManager = userRole === "MANAGER" || isAdmin;
   const isSuperAdmin = userRole === "SUPER_ADMIN";

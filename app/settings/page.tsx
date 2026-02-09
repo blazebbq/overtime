@@ -56,7 +56,12 @@ export default function SettingsPage() {
     setLoading(true);
 
     try {
-      const body: any = {};
+      const body: {
+        name?: string;
+        currentPassword?: string;
+        newPassword?: string;
+        secondaryEmail?: string | null;
+      } = {};
       if (name !== session?.user?.name) {
         body.name = name;
       }
