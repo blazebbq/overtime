@@ -5,12 +5,13 @@ import { prisma } from "@/lib/prisma";
 // GET /api/areas/[id]/shift-colours - Get all shift colours for a specific area
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const { error } = await requireAuth();
   if (error) return error;
 
   try {
+    const params = await context.params;
     const areaId = params.id;
 
     // Get all AreaShiftColour relations for this area

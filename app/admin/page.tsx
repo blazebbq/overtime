@@ -485,20 +485,11 @@ function CreateOvertimeForm({
       setLoading(false);
     }
   };
-      }
-
-      onSuccess();
-    } catch {
-      setError("An error occurred. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loadingData) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-        <div className="text-center text-zinc-400 py-8">Loading areas and shift colours...</div>
+        <div className="text-center text-zinc-400 py-8">Loading areas...</div>
       </div>
     );
   }
