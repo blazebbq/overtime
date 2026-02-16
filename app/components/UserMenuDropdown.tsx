@@ -73,6 +73,12 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
       show: isAdmin,
     },
     {
+      label: "History",
+      icon: ClipboardDocumentListIcon,
+      href: "/admin/history",
+      show: isAdmin,
+    },
+    {
       label: "SuperAdmin Settings",
       icon: WrenchScrewdriverIcon,
       href: "/admin/config",
