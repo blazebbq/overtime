@@ -230,13 +230,17 @@ export async function POST(req: Request) {
           },
         });
 
-        // Increment approved count
+        // Calculate new approved count
+        const newApprovedCount = application.overtime.approvedCount + 1;
+        const willBeFull = newApprovedCount >= application.overtime.requiredPeople;
+
+        // Increment approved count and update status if full
         const updatedOvertime = await tx.overtimeRequest.update({
           where: { id: application.overtimeId },
           data: {
-            approvedCount: {
-              increment: 1,
-            },
+            approvedCount: newApprovedCount,
+            // Set status to FULL when capacity is reached
+            status: willBeFull ? "FULL" : application.overtime.status,
           },
         });
 

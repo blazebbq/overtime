@@ -73,6 +73,12 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
       show: isAdmin,
     },
     {
+      label: "All Overtime Posts",
+      icon: ClipboardDocumentListIcon,
+      href: "/admin/overtime-posts",
+      show: isAdmin,
+    },
+    {
       label: "History",
       icon: ClipboardDocumentListIcon,
       href: "/admin/history",
