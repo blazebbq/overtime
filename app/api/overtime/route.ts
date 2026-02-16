@@ -73,131 +73,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
-  const { user, error } = await requireAuth();
-  if (error) return error;
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { overtimeId } = await req.json();
-
-  const overtime = await prisma.overtimeRequest.findUnique({
-    where: { id: overtimeId },
-    include: { bookings: true },
-  });
-
-  if (!overtime) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // 1️⃣ CHECK IF USER ALREADY BOOKED
-  const existingBooking = await prisma.booking.findUnique({
-    where: {
-      userId_overtimeId: {
-        userId: user.id,
-        overtimeId,
-      },
+  // DISABLED: Direct booking is no longer allowed.
+  // All overtime must go through the application → approval flow.
+  // Use /api/applications instead.
+  
+  return NextResponse.json(
+    { 
+      error: "Direct booking is disabled. Please apply through the application system.",
+      redirect: "/dashboard/available"
     },
-  });
-
-  // 2️⃣ CANCEL IS ALWAYS ALLOWED (EVEN IF FULL)
-  if (existingBooking) {
-    await prisma.booking.delete({
-      where: { id: existingBooking.id },
-    });
-
-    const remaining = await prisma.booking.count({
-      where: { overtimeId },
-    });
-
-    await prisma.overtimeRequest.update({
-      where: { id: overtimeId },
-      data: {
-        status:
-          remaining >= overtime.requiredPeople ? "FULL" : "OPEN",
-      },
-    });
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        action: "BOOKING_CANCELLED",
-        entityType: "Booking",
-        entityId: existingBooking.id,
-        creatorId: user.id,
-        affectedUserId: user.id,
-        changes: JSON.stringify({ overtimeId }),
-      },
-    });
-
-    return NextResponse.json({ ok: true, action: "cancelled" });
-  }
-
-  // 3️⃣ BLOCK ONLY NEW BOOKINGS IF FULL
-  const currentCount = overtime.bookings.length;
-
-  if (currentCount >= overtime.requiredPeople) {
-    await prisma.overtimeRequest.update({
-      where: { id: overtimeId },
-      data: { status: "FULL" },
-    });
-
-    return NextResponse.json(
-      { error: "Shift is full" },
-      { status: 400 }
-    );
-  }
-
-  // 4️⃣ CHECK FOR CONSECUTIVE DAY BREACH (warning only, not blocking)
-  let breachWarning = false;
-  let consecutiveDays = 0;
-  try {
-    const breachCheck = await wouldCreateBreach(user.id, overtime.date);
-    breachWarning = breachCheck.wouldBreach;
-    consecutiveDays = breachCheck.consecutiveDaysAfter;
-  } catch (err) {
-    console.error("Failed to check consecutive days:", err);
-    // Continue with booking even if check fails
-  }
-
-  // 5️⃣ CREATE BOOKING
-  const booking = await prisma.booking.create({
-    data: {
-      userId: user.id,
-      overtimeId,
-    },
-  });
-
-  const newCount = currentCount + 1;
-
-  await prisma.overtimeRequest.update({
-    where: { id: overtimeId },
-    data: {
-      status:
-        newCount >= overtime.requiredPeople ? "FULL" : "OPEN",
-    },
-  });
-
-  // Create audit log
-  await prisma.auditLog.create({
-    data: {
-      action: "BOOKING_CREATED",
-      entityType: "Booking",
-      entityId: booking.id,
-      creatorId: user.id,
-      affectedUserId: user.id,
-      changes: JSON.stringify({ 
-        overtimeId, 
-        breachWarning, 
-        consecutiveDays 
-      }),
-    },
-  });
-
-  return NextResponse.json({ 
-    ok: true, 
-    action: "booked",
-    breachWarning,
-    consecutiveDays,
-  });
+    { status: 403 }
+  );
 }
