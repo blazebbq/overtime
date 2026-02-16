@@ -17,6 +17,10 @@ type Application = {
   approvedEndTime: string | null;
   rejectionReason: string | null;
   createdAt: string;
+  assignedManager?: {
+    id: string;
+    name: string;
+  } | null;
   overtime: {
     id: string;
     date: string;
@@ -179,6 +183,11 @@ export default function MyRequestsPage() {
                       <p className="text-sm text-zinc-400">
                         Applied {new Date(app.createdAt).toLocaleDateString()}
                       </p>
+                      {isPending && app.assignedManager && (
+                        <p className="text-sm text-yellow-400 font-semibold mt-1">
+                          Pending approval from: {app.assignedManager.name}
+                        </p>
+                      )}
                     </div>
                   </div>
                   {getStatusBadge(app.status)}

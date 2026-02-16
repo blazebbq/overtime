@@ -169,31 +169,33 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify manager is assigned to manage this user
-    const managerAssignment = await prisma.managerAssignment.findFirst({
-      where: {
-        managerId: user!.id,
-        userId: application.userId,
-        OR: [{ areaId: null }, { areaId: application.overtime.areaId }],
-      },
-    });
+    // Verify manager is assigned to manage this user (skip for SUPER_ADMIN)
+    if (user!.role !== "SUPER_ADMIN") {
+      const managerAssignment = await prisma.managerAssignment.findFirst({
+        where: {
+          managerId: user!.id,
+          userId: application.userId,
+          OR: [{ areaId: null }, { areaId: application.overtime.areaId }],
+        },
+      });
 
-    if (!managerAssignment) {
-      return NextResponse.json(
-        { error: "You are not assigned to manage this user" },
-        { status: 403 }
-      );
-    }
+      if (!managerAssignment) {
+        return NextResponse.json(
+          { error: "You are not assigned to manage this user" },
+          { status: 403 }
+        );
+      }
 
-    // Additional check for shift colour
-    if (
-      managerAssignment.shiftColourId &&
-      managerAssignment.shiftColourId !== application.overtime.shiftColourId
-    ) {
-      return NextResponse.json(
-        { error: "You are not assigned to manage this shift colour" },
-        { status: 403 }
-      );
+      // Additional check for shift colour
+      if (
+        managerAssignment.shiftColourId &&
+        managerAssignment.shiftColourId !== application.overtime.shiftColourId
+      ) {
+        return NextResponse.json(
+          { error: "You are not assigned to manage this shift colour" },
+          { status: 403 }
+        );
+      }
     }
 
     if (action === "APPROVE") {

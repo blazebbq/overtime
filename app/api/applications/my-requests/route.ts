@@ -23,7 +23,46 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(applications);
+    // For pending applications, find the assigned manager
+    const applicationsWithManager = await Promise.all(
+      applications.map(async (app) => {
+        if (app.status === "PENDING_APPROVAL") {
+          // Find the manager assignment
+          const managerAssignment = await prisma.managerAssignment.findFirst({
+            where: {
+              userId: user!.id,
+              OR: [
+                { areaId: null },
+                { areaId: app.overtime.areaId },
+              ],
+            },
+            include: {
+              manager: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+            orderBy: {
+              // Prefer specific area assignments over global ones
+              areaId: "desc",
+            },
+          });
+
+          return {
+            ...app,
+            assignedManager: managerAssignment?.manager || null,
+          };
+        }
+        return {
+          ...app,
+          assignedManager: null,
+        };
+      })
+    );
+
+    return NextResponse.json(applicationsWithManager);
   } catch (err) {
     console.error("Error fetching user applications:", err);
     return NextResponse.json(
