@@ -63,7 +63,7 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
     {
       label: "Manager Approvals",
       icon: UserGroupIcon,
-      href: "/manager/approvals",
+      href: "/manager/overtime-posts",
       show: isManager,
     },
     {

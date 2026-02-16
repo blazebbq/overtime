@@ -27,6 +27,10 @@ export default function DashboardHub() {
     );
   }
 
+  const userRole = (session?.user as { role?: string })?.role || "USER";
+  const isManager = userRole === "MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+
   const dashboardCards = [
     {
       title: "My Upcoming Overtime",
@@ -34,6 +38,7 @@ export default function DashboardHub() {
       icon: "📅",
       href: "/dashboard/upcoming",
       gradient: "from-blue-500 to-purple-600",
+      show: true,
     },
     {
       title: "My Requests",
@@ -41,6 +46,7 @@ export default function DashboardHub() {
       icon: "📋",
       href: "/dashboard/requests",
       gradient: "from-green-500 to-teal-600",
+      show: true,
     },
     {
       title: "Available Overtime",
@@ -48,8 +54,25 @@ export default function DashboardHub() {
       icon: "🔓",
       href: "/dashboard/available",
       gradient: "from-orange-500 to-red-600",
+      show: true,
     },
-  ];
+    {
+      title: "Manager Approvals",
+      description: "Review and approve overtime applications",
+      icon: "✅",
+      href: "/manager/overtime-posts",
+      gradient: "from-yellow-500 to-orange-600",
+      show: isManager,
+    },
+    {
+      title: "Admin Panel",
+      description: "Manage overtime posts, users, and system settings",
+      icon: "⚙️",
+      href: "/admin",
+      gradient: "from-purple-500 to-pink-600",
+      show: isAdmin,
+    },
+  ].filter(card => card.show);
 
   return (
     <>
