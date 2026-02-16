@@ -1,20 +1,20 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth";
+import { requireManagerOrAdmin } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 // Create new overtime request
 export async function POST(req: Request) {
-  const { user, error } = await requireAdmin();
+  const { user, error } = await requireManagerOrAdmin();
   if (error) return error;
 
   try {
     const body = await req.json();
-    const { date, areaId, shiftColourId, startTime, endTime, requiredPeople } = body;
+    const { date, areaId, shiftColourId, areaShiftColourId, startTime, endTime, requiredPeople } = body;
 
     // Validation
-    if (!date || !areaId || !shiftColourId || !startTime || !endTime || !requiredPeople) {
+    if (!date || !areaId || !startTime || !endTime || !requiredPeople) {
       return NextResponse.json(
-        { error: "All fields are required" },
+        { error: "Date, area, times, and required people are required" },
         { status: 400 }
       );
     }
@@ -38,31 +38,67 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify shift colour exists and is enabled
-    const shiftColour = await prisma.shiftColour.findUnique({
-      where: { id: shiftColourId },
-    });
+    // Use areaShiftColourId if provided (preferred), otherwise use shiftColourId for backward compatibility
+    let finalAreaShiftColourId = areaShiftColourId;
+    let finalShiftColourId = shiftColourId;
 
-    if (!shiftColour) {
-      return NextResponse.json(
-        { error: "Invalid shift colour" },
-        { status: 400 }
-      );
-    }
+    if (areaShiftColourId) {
+      // Verify the areaShiftColour exists
+      const areaShiftColour = await prisma.areaShiftColour.findUnique({
+        where: { id: areaShiftColourId },
+        include: { shiftColour: true },
+      });
 
-    // Verify the shift colour is available for this area
-    const areaShiftColour = await prisma.areaShiftColour.findUnique({
-      where: {
-        areaId_shiftColourId: {
-          areaId,
-          shiftColourId,
+      if (!areaShiftColour) {
+        return NextResponse.json(
+          { error: "Invalid area-shift colour combination" },
+          { status: 400 }
+        );
+      }
+
+      // Ensure it matches the selected area
+      if (areaShiftColour.areaId !== areaId) {
+        return NextResponse.json(
+          { error: "Area-shift colour combination does not match selected area" },
+          { status: 400 }
+        );
+      }
+
+      finalShiftColourId = areaShiftColour.shiftColourId;
+    } else if (shiftColourId) {
+      // Backward compatibility: if only shiftColourId provided, verify and find areaShiftColourId
+      const shiftColour = await prisma.shiftColour.findUnique({
+        where: { id: shiftColourId },
+      });
+
+      if (!shiftColour) {
+        return NextResponse.json(
+          { error: "Invalid shift colour" },
+          { status: 400 }
+        );
+      }
+
+      // Find the AreaShiftColour relation
+      const areaShiftColour = await prisma.areaShiftColour.findUnique({
+        where: {
+          areaId_shiftColourId: {
+            areaId,
+            shiftColourId,
+          },
         },
-      },
-    });
+      });
 
-    if (!areaShiftColour) {
+      if (!areaShiftColour) {
+        return NextResponse.json(
+          { error: "This shift colour is not available for the selected area" },
+          { status: 400 }
+        );
+      }
+
+      finalAreaShiftColourId = areaShiftColour.id;
+    } else {
       return NextResponse.json(
-        { error: "This shift colour is not available for the selected area" },
+        { error: "Either areaShiftColourId or shiftColourId is required" },
         { status: 400 }
       );
     }
@@ -71,7 +107,8 @@ export async function POST(req: Request) {
       data: {
         date: new Date(date),
         areaId,
-        shiftColourId,
+        shiftColourId: finalShiftColourId,
+        areaShiftColourId: finalAreaShiftColourId,
         startTime,
         endTime,
         requiredPeople: parseInt(requiredPeople),
@@ -89,7 +126,8 @@ export async function POST(req: Request) {
         changes: JSON.stringify({
           date,
           areaId,
-          shiftColourId,
+          shiftColourId: finalShiftColourId,
+          areaShiftColourId: finalAreaShiftColourId,
           startTime,
           endTime,
           requiredPeople,
@@ -109,7 +147,7 @@ export async function POST(req: Request) {
 
 // Get all overtime requests (including archived)
 export async function GET() {
-  const { user, error } = await requireAdmin();
+  const { user, error } = await requireManagerOrAdmin();
   if (error) return error;
 
   try {

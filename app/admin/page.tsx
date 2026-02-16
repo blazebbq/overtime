@@ -48,9 +48,10 @@ type Area = {
 
 type ShiftColour = {
   id: string;
+  areaShiftColourId: string;
   name: string;
-  hexColour: string;
-  areaId: string;
+  hexColor: string;
+  enabled: boolean;
 };
 
 export default function AdminDashboard() {
@@ -392,64 +393,71 @@ function CreateOvertimeForm({
   const [formData, setFormData] = useState({
     date: "",
     areaId: "",
-    shiftColourId: "",
+    areaShiftColourId: "",
     startTime: "07:00",
     endTime: "19:00",
     requiredPeople: "2",
   });
   const [areas, setAreas] = useState<Area[]>([]);
   const [shiftColours, setShiftColours] = useState<ShiftColour[]>([]);
-  const [filteredShiftColours, setFilteredShiftColours] = useState<ShiftColour[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [loadingShiftColours, setLoadingShiftColours] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const loadAreasAndShiftColours = async () => {
+    const loadAreas = async () => {
       try {
-        const [areasRes, shiftColoursRes] = await Promise.all([
-          fetch("/api/admin/areas"),
-          fetch("/api/admin/shift-colours"),
-        ]);
+        const areasRes = await fetch("/api/admin/areas");
 
-        if (!areasRes.ok || !shiftColoursRes.ok) {
-          setError("Failed to load areas or shift colours");
+        if (!areasRes.ok) {
+          setError("Failed to load areas");
           return;
         }
 
         const areasData = await areasRes.json();
-        const shiftColoursData = await shiftColoursRes.json();
-
         setAreas(areasData.filter((a: Area) => a.enabled));
-        setShiftColours(shiftColoursData);
       } catch {
-        setError("An error occurred while loading data");
+        setError("An error occurred while loading areas");
       } finally {
         setLoadingData(false);
       }
     };
 
-    loadAreasAndShiftColours();
+    loadAreas();
   }, []);
 
   useEffect(() => {
     if (formData.areaId) {
-      const filtered = shiftColours.filter(sc => sc.areaId === formData.areaId);
-      setFilteredShiftColours(filtered);
-      if (!filtered.find(sc => sc.id === formData.shiftColourId)) {
-        setFormData(prev => ({ ...prev, shiftColourId: "" }));
-      }
+      const loadShiftColoursForArea = async () => {
+        setLoadingShiftColours(true);
+        try {
+          const res = await fetch(`/api/areas/${formData.areaId}/shift-colours`);
+          if (!res.ok) {
+            setError("Failed to load shift colours for area");
+            return;
+          }
+          const data = await res.json();
+          setShiftColours(data.filter((sc: ShiftColour) => sc.enabled));
+        } catch {
+          setError("An error occurred while loading shift colours");
+        } finally {
+          setLoadingShiftColours(false);
+        }
+      };
+
+      loadShiftColoursForArea();
     } else {
-      setFilteredShiftColours([]);
-      setFormData(prev => ({ ...prev, shiftColourId: "" }));
+      setShiftColours([]);
+      setFormData(prev => ({ ...prev, areaShiftColourId: "" }));
     }
-  }, [formData.areaId, formData.shiftColourId, shiftColours]);
+  }, [formData.areaId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!formData.areaId || !formData.shiftColourId) {
+    if (!formData.areaId || !formData.areaShiftColourId) {
       setError("Please select both area and shift colour");
       return;
     }
@@ -468,6 +476,15 @@ function CreateOvertimeForm({
       if (!res.ok) {
         setError(data.error || "Failed to create overtime request");
         return;
+      }
+
+      onSuccess();
+    } catch {
+      setError("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
       }
 
       onSuccess();
@@ -552,25 +569,29 @@ function CreateOvertimeForm({
             <label className="block text-sm font-medium text-zinc-300 mb-3">
               🎨 Shift Colour
             </label>
-            {filteredShiftColours.length === 0 ? (
+            {loadingShiftColours ? (
+              <div className="text-sm text-zinc-400 py-2">
+                Loading shift colours...
+              </div>
+            ) : shiftColours.length === 0 ? (
               <div className="text-sm text-zinc-400 py-2">
                 No shift colours available for this area
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {filteredShiftColours.map((shiftColour) => (
+                {shiftColours.map((shiftColour) => (
                   <button
-                    key={shiftColour.id}
+                    key={shiftColour.areaShiftColourId}
                     type="button"
-                    onClick={() => setFormData({ ...formData, shiftColourId: shiftColour.id })}
+                    onClick={() => setFormData({ ...formData, areaShiftColourId: shiftColour.areaShiftColourId })}
                     className={`px-4 py-3 rounded-xl font-bold transition-all duration-200 ${
-                      formData.shiftColourId === shiftColour.id
+                      formData.areaShiftColourId === shiftColour.areaShiftColourId
                         ? "ring-4 ring-blue-500 scale-105 shadow-xl"
                         : "opacity-70 hover:opacity-100 hover:scale-105"
                     }`}
                     style={{
-                      backgroundColor: shiftColour.hexColour,
-                      color: parseInt(shiftColour.hexColour.slice(1), 16) > 0xffffff / 2 ? '#000' : '#fff'
+                      backgroundColor: shiftColour.hexColor,
+                      color: parseInt(shiftColour.hexColor.slice(1), 16) > 0xffffff / 2 ? '#000' : '#fff'
                     }}
                   >
                     {shiftColour.name}

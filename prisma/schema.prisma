@@ -56,8 +56,9 @@ model AreaShiftColour {
   areaId        String
   shiftColourId String
 
-  area        Area        @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  shiftColour ShiftColour @relation(fields: [shiftColourId], references: [id], onDelete: Cascade)
+  area             Area              @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  shiftColour      ShiftColour       @relation(fields: [shiftColourId], references: [id], onDelete: Cascade)
+  overtimeRequests OvertimeRequest[]
 
   @@unique([areaId, shiftColourId])
 }
@@ -101,28 +102,30 @@ model ManagerAssignment {
 }
 
 model OvertimeRequest {
-  id             String   @id @default(cuid())
+  id                 String   @id @default(cuid())
 
   // Core
-  date           DateTime
-  areaId         String
-  shiftColourId  String
-  startTime      String   // "07:00"
-  endTime        String   // "19:00"
-  requiredPeople Int
-  approvedCount  Int      @default(0) // Number of approved applications
+  date               DateTime
+  areaId             String
+  shiftColourId      String
+  areaShiftColourId  String?  // Preferred: Links to AreaShiftColour relation
+  startTime          String   // "07:00"
+  endTime            String   // "19:00"
+  requiredPeople     Int
+  approvedCount      Int      @default(0) // Number of approved applications
 
   // Lifecycle
-  status         String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
+  status             String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
 
-  createdAt      DateTime @default(now())
+  createdAt          DateTime @default(now())
 
   // Relations
-  area           Area         @relation(fields: [areaId], references: [id])
-  shiftColour    ShiftColour  @relation(fields: [shiftColourId], references: [id])
-  bookings       Booking[]
-  applications   OvertimeApplication[]
-  approvals      OvertimeApproval[]
+  area               Area         @relation(fields: [areaId], references: [id])
+  shiftColour        ShiftColour  @relation(fields: [shiftColourId], references: [id])
+  areaShiftColour    AreaShiftColour? @relation(fields: [areaShiftColourId], references: [id])
+  bookings           Booking[]
+  applications       OvertimeApplication[]
+  approvals          OvertimeApproval[]
 }
 
 model Booking {
