@@ -102,19 +102,27 @@ export async function POST(req: Request) {
       );
     }
 
-    // Check if user already has an application
-    const existingApplication = await prisma.overtimeApplication.findUnique({
+    // Check if user has an ACTIVE application (block reapplication for these statuses)
+    // Allow reapplication if previous status was REJECTED or CANCELLED
+    const activeApplication = await prisma.overtimeApplication.findFirst({
       where: {
-        userId_overtimeId: {
-          userId: user.id,
-          overtimeId,
+        userId: user.id,
+        overtimeId,
+        status: {
+          in: ["PENDING_APPROVAL", "APPROVED", "CANCEL_PENDING"],
         },
       },
     });
 
-    if (existingApplication) {
+    if (activeApplication) {
+      const statusMessages: Record<string, string> = {
+        PENDING_APPROVAL: "You already have a pending application for this overtime",
+        APPROVED: "You are already approved for this overtime",
+        CANCEL_PENDING: "You have a cancellation pending for this overtime",
+      };
+      
       return NextResponse.json(
-        { error: "You have already applied for this overtime" },
+        { error: statusMessages[activeApplication.status] || "You already have an active application for this overtime" },
         { status: 400 }
       );
     }

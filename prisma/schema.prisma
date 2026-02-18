@@ -152,13 +152,19 @@ model OvertimeApplication {
   comment            String?   // Optional user comment
   
   // Approval status
-  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED_MANUAL | REJECTED_CAPACITY
+  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED_MANUAL | REJECTED_CAPACITY | CANCEL_PENDING | CANCELLED
   
   // Approval details (filled when status changes)
   approvedStartTime  String?   // Manager-approved start time
   approvedEndTime    String?   // Manager-approved end time
   approverId         String?   // Manager who approved/rejected
   rejectionReason    String?   // Reason if rejected manually
+  
+  // Cancellation audit fields
+  cancellationRequestedAt     DateTime? // When cancellation was requested
+  cancellationRequestedReason String?   // User's reason for requesting cancellation
+  cancellationApprovedAt      DateTime? // When cancellation was approved
+  cancellationApprovedById    String?   // Manager who approved cancellation
   
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -167,7 +173,8 @@ model OvertimeApplication {
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   overtime           OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, overtimeId])
+  // Removed unique constraint to allow reapplication after rejection/cancellation
+  @@index([userId, overtimeId])
   @@index([overtimeId, status])
 }
 

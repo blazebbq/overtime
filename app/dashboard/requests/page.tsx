@@ -54,6 +54,14 @@ function getStatusBadge(status: string) {
       label: "⚠ Capacity Full",
       className: "bg-orange-600 text-white",
     },
+    CANCEL_PENDING: {
+      label: "🔄 Cancellation Pending",
+      className: "bg-orange-500 text-white",
+    },
+    CANCELLED: {
+      label: "❌ Cancelled",
+      className: "bg-gray-600 text-white",
+    },
   };
 
   const badge = badges[status] || { label: status, className: "bg-gray-500 text-white" };
@@ -71,6 +79,10 @@ export default function MyRequestsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -97,6 +109,75 @@ export default function MyRequestsPage() {
       setError("Failed to load requests");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelPending = async (applicationId: string) => {
+    if (!confirm("Are you sure you want to cancel this application?")) {
+      return;
+    }
+
+    setCancellingId(applicationId);
+    try {
+      const res = await fetch("/api/applications/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to cancel application");
+      }
+
+      await loadRequests();
+      alert("Application cancelled successfully");
+    } catch (err) {
+      console.error("Failed to cancel application:", err);
+      alert(err instanceof Error ? err.message : "Failed to cancel application");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const handleRequestCancellation = (applicationId: string) => {
+    setSelectedAppId(applicationId);
+    setCancellationReason("");
+    setShowCancelModal(true);
+  };
+
+  const handleSubmitCancellation = async () => {
+    if (!selectedAppId || !cancellationReason.trim()) {
+      alert("Please provide a reason for cancellation");
+      return;
+    }
+
+    setCancellingId(selectedAppId);
+    try {
+      const res = await fetch("/api/applications/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: selectedAppId,
+          cancellationReason: cancellationReason.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to request cancellation");
+      }
+
+      await loadRequests();
+      setShowCancelModal(false);
+      setSelectedAppId(null);
+      setCancellationReason("");
+      alert("Cancellation request submitted successfully");
+    } catch (err) {
+      console.error("Failed to request cancellation:", err);
+      alert(err instanceof Error ? err.message : "Failed to request cancellation");
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -158,6 +239,9 @@ export default function MyRequestsPage() {
             const isPending = app.status === "PENDING_APPROVAL";
             const isApproved = app.status === "APPROVED";
             const isRejected = app.status.startsWith("REJECTED");
+            const isCancelPending = app.status === "CANCEL_PENDING";
+            const isCancelled = app.status === "CANCELLED";
+            const canReapply = isRejected || isCancelled;
 
             return (
               <div
@@ -167,6 +251,10 @@ export default function MyRequestsPage() {
                     ? "bg-zinc-800 border-yellow-500/50"
                     : isApproved
                     ? "bg-green-900/20 border-green-500/50"
+                    : isCancelPending
+                    ? "bg-orange-900/20 border-orange-500/50"
+                    : isCancelled
+                    ? "bg-gray-900/20 border-gray-500/50"
                     : "bg-red-900/20 border-red-500/50"
                 }`}
               >
@@ -223,7 +311,7 @@ export default function MyRequestsPage() {
                 )}
 
                 {isApproved && app.approvedStartTime && app.approvedEndTime && (
-                  <div className="p-3 bg-green-900/30 rounded-lg border border-green-500/50">
+                  <div className="p-3 bg-green-900/30 rounded-lg border border-green-500/50 mb-4">
                     <strong className="text-green-300 text-sm">Approved Hours:</strong>
                     <p className="text-green-200 text-sm mt-1">
                       {app.approvedStartTime} – {app.approvedEndTime}
@@ -232,15 +320,86 @@ export default function MyRequestsPage() {
                 )}
 
                 {isRejected && app.rejectionReason && (
-                  <div className="p-3 bg-red-900/30 rounded-lg border border-red-500/50">
+                  <div className="p-3 bg-red-900/30 rounded-lg border border-red-500/50 mb-4">
                     <strong className="text-red-300 text-sm">Rejection Reason:</strong>
                     <p className="text-red-200 text-sm mt-1">{app.rejectionReason}</p>
                   </div>
                 )}
+
+                {/* Action buttons */}
+                <div className="flex gap-3 mt-4">
+                  {isPending && (
+                    <button
+                      onClick={() => handleCancelPending(app.id)}
+                      disabled={cancellingId === app.id}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+                    >
+                      {cancellingId === app.id ? "Cancelling..." : "Cancel Request"}
+                    </button>
+                  )}
+
+                  {isApproved && (
+                    <button
+                      onClick={() => handleRequestCancellation(app.id)}
+                      disabled={cancellingId === app.id}
+                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+                    >
+                      Request Cancellation
+                    </button>
+                  )}
+
+                  {canReapply && (
+                    <Link
+                      href="/dashboard/available"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+                    >
+                      Apply Again
+                    </Link>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
+
+        {/* Cancellation Modal */}
+        {showCancelModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-zinc-800 rounded-xl p-6 max-w-md w-full border-2 border-orange-500">
+              <h2 className="text-2xl font-bold text-white mb-4">Request Cancellation</h2>
+              <p className="text-zinc-300 mb-4">
+                Please provide a reason for requesting cancellation. This will be sent to your manager for approval.
+              </p>
+              <textarea
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                className="w-full p-3 bg-zinc-700 text-white rounded-lg border-2 border-zinc-600 focus:border-orange-500 focus:outline-none mb-4"
+                rows={4}
+                placeholder="Enter your reason for cancellation..."
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSubmitCancellation}
+                  disabled={!cancellationReason.trim() || cancellingId !== null}
+                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+                >
+                  {cancellingId ? "Submitting..." : "Submit Request"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setSelectedAppId(null);
+                    setCancellationReason("");
+                  }}
+                  disabled={cancellingId !== null}
+                  className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );
