@@ -91,7 +91,8 @@ export async function POST(req: Request) {
         data: {
           status: "CANCELLED",
           cancellationApprovedAt: new Date(),
-          cancellationApprovedById: user.id,
+          // For self-cancellation of pending apps, leave approvedById null since no approval was needed
+          cancellationApprovedById: null,
         },
       });
 
@@ -107,6 +108,7 @@ export async function POST(req: Request) {
             previousStatus: "PENDING_APPROVAL",
             newStatus: "CANCELLED",
             immediate: true,
+            selfCancelled: true,
           }),
         },
       });

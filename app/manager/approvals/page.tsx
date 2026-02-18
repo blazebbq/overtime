@@ -373,7 +373,7 @@ export default function ManagerApprovalsPage() {
                     </div>
                     <div className="text-sm text-zinc-300">
                       <strong className="text-white">Requested:</strong>{" "}
-                      {app.cancellationRequestedAt ? new Date(app.cancellationRequestedAt).toLocaleString() : "N/A"}
+                      {new Date(app.cancellationRequestedAt || app.createdAt).toLocaleString()}
                     </div>
                   </div>
 
