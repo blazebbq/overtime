@@ -49,6 +49,11 @@ export default function AdminLayout({
       icon: BuildingOfficeIcon,
     },
     {
+      name: "Floors",
+      href: "/admin/floors",
+      icon: BuildingOfficeIcon,
+    },
+    {
       name: "Issue Types",
       href: "/admin/issue-types",
       icon: TagIcon,
