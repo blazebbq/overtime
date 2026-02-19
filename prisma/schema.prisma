@@ -3,47 +3,202 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  Admin
+  User
+  QA
+  EngineeringManager
+}
+
+enum WalkdownMode {
+  BlockOpen
+  DailyWalkRound
+}
+
+enum WalkdownStatus {
+  Draft
+  Submitted
+  Archived
+}
+
+enum IssueStatus {
+  Open
+  InProgress
+  Rectified
+  Closed
+}
+
+enum SignOffRole {
+  RaisedBy
+  Maintenance
+  QA
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(User)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  createdWalkdowns      Walkdown[]    @relation("WalkdownCreator")
+  createdIssues         Issue[]       @relation("IssueCreator")
+  rectifiedIssues       Issue[]       @relation("IssueRectifier")
+  qaVerifiedIssues      Issue[]       @relation("IssueQAVerifier")
+  signOffs              SignOff[]
+}
+
+model Building {
+  id        String   @id @default(uuid())
   name      String
-  password  String
-  role      String   @default("USER") // USER | ADMIN
+  siteCode  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  floors    Floor[]
+  walkdowns Walkdown[]
+  issues    Issue[]
+}
+
+model Floor {
+  id                  String   @id @default(uuid())
+  buildingId          String
+  name                String
+  blueprintImageUrl   String?
+  blueprintWidthPx    Int?
+  blueprintHeightPx   Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  building  Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  rooms     Room[]
+  walkdowns Walkdown[]
+  issues    Issue[]
+}
+
+model Room {
+  id          String   @id @default(uuid())
+  floorId     String
+  name        String
+  roomNumber  String
+  polygonJson String   // JSON array of normalized points [{x: 0.1, y: 0.2}, ...]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  floor  Floor   @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  issues Issue[]
+}
+
+model IssueType {
+  id        String   @id @default(uuid())
+  name      String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  issues Issue[]
+}
+
+model Walkdown {
+  id              String         @id @default(uuid())
+  walkdownId      String         // Human-readable ID like "Block Open Feb 2026"
+  buildingId      String
+  floorId         String
+  mode            WalkdownMode
+  status          WalkdownStatus @default(Draft)
+  createdByUserId String
+  submittedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  building   Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  floor      Floor     @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  createdBy  User      @relation("WalkdownCreator", fields: [createdByUserId], references: [id])
+  issues     Issue[]
+  signOffs   SignOff[]
+
+  @@index([buildingId, floorId])
+  @@index([status])
+  @@index([mode])
+}
+
+model Issue {
+  id                String      @id @default(uuid())
+  walkdownId        String
+  buildingId        String
+  floorId           String
+  roomId            String
+  issueTypeId       String
+  description       String      @db.Text
+  status            IssueStatus @default(Open)
+  pinX              Float       // Normalized 0..1
+  pinY              Float       // Normalized 0..1
+  pinContext        String      @default("floor") // "floor" only in v1
+  createdByUserId   String
+  rectifiedAt       DateTime?
+  rectifiedByUserId String?
+  qaVerifiedAt      DateTime?
+  qaVerifiedByUserId String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  walkdown        Walkdown    @relation(fields: [walkdownId], references: [id], onDelete: Cascade)
+  building        Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  floor           Floor       @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  room            Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  issueType       IssueType   @relation(fields: [issueTypeId], references: [id])
+  createdBy       User        @relation("IssueCreator", fields: [createdByUserId], references: [id])
+  rectifiedBy     User?       @relation("IssueRectifier", fields: [rectifiedByUserId], references: [id])
+  qaVerifiedBy    User?       @relation("IssueQAVerifier", fields: [qaVerifiedByUserId], references: [id])
+  photos          IssuePhoto[]
+
+  @@index([walkdownId])
+  @@index([buildingId, floorId])
+  @@index([roomId])
+  @@index([status])
+  @@index([issueTypeId])
+  @@index([createdAt])
+}
+
+model IssuePhoto {
+  id        String   @id @default(uuid())
+  issueId   String
+  photoUrl  String
   createdAt DateTime @default(now())
 
-  bookings  Booking[]
+  // Relations
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
 }
 
-model OvertimeRequest {
-  id             String   @id @default(cuid())
+model SignOff {
+  id         String      @id @default(uuid())
+  walkdownId String
+  userId     String?
+  role       SignOffRole
+  signedName String
+  signedDate DateTime
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
-  // Core
-  date           DateTime
-  shift          String   // YELLOW | ORANGE | PURPLE | GREEN
-  startTime      String   // "07:00"
-  endTime        String   // "19:00"
-  requiredPeople Int
+  // Relations
+  walkdown Walkdown @relation(fields: [walkdownId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id])
 
-  // Lifecycle
-  status         String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
-
-  createdAt      DateTime @default(now())
-
-  bookings       Booking[]
-}
-
-model Booking {
-  id         String   @id @default(cuid())
-  userId     String
-  overtimeId String
-  createdAt  DateTime @default(now())
-
-  user       User            @relation(fields: [userId], references: [id])
-  overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id])
-
-  @@unique([userId, overtimeId])
+  @@index([walkdownId])
 }
