@@ -87,6 +87,66 @@ export default function InboxPage() {
     router.push(`/overtime/${item.overtimePost.id}`);
   };
 
+  const handleApproveCancellation = async (
+    e: React.MouseEvent,
+    applicationId: string
+  ) => {
+    e.stopPropagation(); // Prevent card click
+    if (!confirm("Approve this cancellation request?")) return;
+
+    try {
+      const response = await fetch("/api/manager/cancellation-approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "approve",
+        }),
+      });
+
+      if (response.ok) {
+        alert("Cancellation approved successfully");
+        loadInboxItems();
+      } else {
+        const data = await response.json();
+        alert(`Failed to approve: ${data.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to approve cancellation:", error);
+      alert("Failed to approve cancellation");
+    }
+  };
+
+  const handleRejectCancellation = async (
+    e: React.MouseEvent,
+    applicationId: string
+  ) => {
+    e.stopPropagation(); // Prevent card click
+    if (!confirm("Reject this cancellation request? The user will remain assigned to the overtime.")) return;
+
+    try {
+      const response = await fetch("/api/manager/cancellation-approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "reject",
+        }),
+      });
+
+      if (response.ok) {
+        alert("Cancellation rejected successfully");
+        loadInboxItems();
+      } else {
+        const data = await response.json();
+        alert(`Failed to reject: ${data.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to reject cancellation:", error);
+      alert("Failed to reject cancellation");
+    }
+  };
+
   const getTypeLabel = (type: InboxItemType) => {
     return type === "APPLICATION_REQUEST"
       ? "New Application"
@@ -274,9 +334,25 @@ export default function InboxPage() {
                     </div>
                   </div>
 
-                  <div className="ml-4">
+                  <div className="ml-4 flex flex-col gap-2">
+                    {item.type === "CANCELLATION_REQUEST" && item.status !== "RESOLVED" && (
+                      <>
+                        <button
+                          onClick={(e) => handleApproveCancellation(e, item.applicationId)}
+                          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
+                        >
+                          Approve Cancellation
+                        </button>
+                        <button
+                          onClick={(e) => handleRejectCancellation(e, item.applicationId)}
+                          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium"
+                        >
+                          Reject Cancellation
+                        </button>
+                      </>
+                    )}
                     <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                      View →
+                      View Details →
                     </button>
                   </div>
                 </div>

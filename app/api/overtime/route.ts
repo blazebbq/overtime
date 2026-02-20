@@ -2,10 +2,19 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { wouldCreateBreach } from "@/lib/consecutive-days";
+import { autoArchiveOldOvertimePosts } from "@/lib/archiveUtils";
 
 export async function GET(req: NextRequest) {
   const { user, error } = await requireAuth();
   if (error) return error;
+
+  // Auto-archive overtime posts older than 5 days
+  try {
+    await autoArchiveOldOvertimePosts();
+  } catch (err) {
+    console.error("Auto-archive error:", err);
+    // Continue even if archiving fails
+  }
 
   const searchParams = req.nextUrl.searchParams;
   const areaId = searchParams.get("areaId");
@@ -13,13 +22,18 @@ export async function GET(req: NextRequest) {
   const showAvailableOnly = searchParams.get("availableOnly") === "true";
   const showMyBookingsOnly = searchParams.get("myBookingsOnly") === "true";
   const showMyApplicationsOnly = searchParams.get("myApplicationsOnly") === "true";
+  const showArchived = searchParams.get("showArchived") === "true";
 
   const where: {
-    status: { in: string[] };
+    status?: { in: string[] };
+    archived?: boolean;
     areaId?: string;
     shiftColourId?: string;
-  } = {
+  } = showArchived ? {
+    // When showing archived, include all statuses
+  } : {
     status: { in: ["OPEN", "FULL"] },
+    archived: false,
   };
 
   if (areaId) {
