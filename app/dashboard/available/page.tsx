@@ -30,6 +30,9 @@ type Overtime = {
     id: string;
     status: string;
   };
+  acceptedWorkers?: Array<{
+    name: string;
+  }>;
 };
 
 function getTextColor(hexColor: string): string {
@@ -409,6 +412,30 @@ export default function AvailableOvertimePage() {
                     </span>
                   )}
                 </div>
+
+                {/* Accepted Workers Section */}
+                <div className={`text-sm mb-4 ${textColor} opacity-90`}>
+                  <div className="font-semibold mb-1">Accepted:</div>
+                  {ot.acceptedWorkers && ot.acceptedWorkers.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {ot.acceptedWorkers.map((worker, idx) => (
+                        <span key={idx} className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
+                          {worker.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="italic opacity-75">None yet</span>
+                  )}
+                </div>
+
+                {/* View Details Link */}
+                <Link
+                  href={`/overtime/${ot.id}`}
+                  className={`block text-center mb-3 py-2 px-4 rounded-xl font-semibold transition-all ${textColor} bg-white bg-opacity-20 hover:bg-opacity-30`}
+                >
+                  👁️ View Details
+                </Link>
 
                 {/* Show different states based on application status */}
                 {applicationStatus === "PENDING_APPROVAL" && userApplication ? (

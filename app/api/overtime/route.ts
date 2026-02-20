@@ -57,11 +57,13 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  // Transform data to include userApplication separately
+  // Transform data to include userApplication separately and accepted workers
   const overtimeWithUserApp = overtime.map(ot => {
     const userApplication = user 
       ? ot.applications.find(app => app.userId === user.id)
       : undefined;
+    
+    const approvedApps = ot.applications.filter(app => app.status === "APPROVED");
     
     return {
       ...ot,
@@ -70,7 +72,11 @@ export async function GET(req: NextRequest) {
         status: userApplication.status,
       } : undefined,
       // Keep applications as approved only for display
-      applications: ot.applications.filter(app => app.status === "APPROVED"),
+      applications: approvedApps,
+      // Add accepted workers names for display on cards
+      acceptedWorkers: approvedApps.map(app => ({
+        name: app.user.name,
+      })),
     };
   });
 
