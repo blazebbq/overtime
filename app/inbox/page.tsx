@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Header from "../components/Header";
 
 type InboxItemType = "APPLICATION_REQUEST" | "CANCELLATION_REQUEST";
 type InboxItemStatus = "UNREAD" | "OPEN" | "RESOLVED";
@@ -12,6 +13,7 @@ interface InboxItem {
   status: InboxItemStatus;
   createdAt: string;
   resolvedAt: string | null;
+  cancellationRequestedReason: string | null;
   requester: {
     id: string;
     name: string | null;
@@ -142,14 +144,16 @@ export default function InboxPage() {
   const openCount = items.filter((item) => item.status === "OPEN").length;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Manager Inbox</h1>
-          <p className="text-gray-600">
-            Review and manage overtime applications and cancellation requests
-          </p>
-        </div>
+    <>
+      <Header />
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold mb-2">Manager Inbox</h1>
+            <p className="text-gray-600">
+              Review and manage overtime applications and cancellation requests
+            </p>
+          </div>
 
         {/* Filter Tabs */}
         <div className="bg-white rounded-lg shadow mb-6">
@@ -255,6 +259,13 @@ export default function InboxPage() {
                       </div>
                     </div>
 
+                    {item.type === "CANCELLATION_REQUEST" && item.cancellationRequestedReason && (
+                      <div className="text-sm text-gray-700 mb-2 bg-yellow-50 border-l-4 border-yellow-400 p-2">
+                        <span className="font-semibold">Reason: </span>
+                        <span>{item.cancellationRequestedReason}</span>
+                      </div>
+                    )}
+
                     <div className="text-xs text-gray-500">
                       Requested: {formatDateTime(item.createdAt)}
                       {item.resolvedAt && (
@@ -275,5 +286,6 @@ export default function InboxPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

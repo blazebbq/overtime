@@ -18,11 +18,39 @@ export async function GET(req: NextRequest) {
       // SuperAdmin sees ALL inbox items
       whereClause = {};
     } else if (user!.role === "ADMIN" || user!.role === "MANAGER") {
-      // Managers/Admins see items assigned to them OR items with no assignment (fallback)
+      // Find manager's assigned areas and users
+      const managerAssignments = await prisma.managerAssignment.findMany({
+        where: { managerId: user!.id },
+        select: {
+          userId: true,
+          areaId: true,
+          shiftColourId: true,
+        },
+      });
+
+      const assignedUserIds = managerAssignments
+        .filter((a) => a.userId)
+        .map((a) => a.userId);
+
+      const assignedAreaIds = managerAssignments
+        .filter((a) => a.areaId)
+        .map((a) => a.areaId);
+
+      // Managers/Admins see items where:
+      // 1. Assigned directly to them
+      // 2. Requester is their assigned user (direct report)
+      // 3. Area is their assigned area
+      // 4. No specific assignment (fallback)
       whereClause = {
         OR: [
           { assignedToUserId: user!.id },
           { assignedToUserId: null }, // Items without specific assignment
+          ...(assignedUserIds.length > 0
+            ? [{ requesterUserId: { in: assignedUserIds } }]
+            : []),
+          ...(assignedAreaIds.length > 0
+            ? [{ areaId: { in: assignedAreaIds } }]
+            : []),
         ],
       };
     } else {
@@ -70,6 +98,7 @@ export async function GET(req: NextRequest) {
       status: item.status,
       createdAt: item.createdAt.toISOString(),
       resolvedAt: item.resolvedAt?.toISOString() || null,
+      cancellationRequestedReason: item.application.cancellationRequestedReason,
       requester: {
         id: item.application.user.id,
         name: item.application.user.name,
@@ -81,24 +110,15 @@ export async function GET(req: NextRequest) {
         startTime: item.post.startTime,
         endTime: item.post.endTime,
         area: {
-          id: item.post.area.id,
           name: item.post.area.name,
+          colour: item.post.shiftColour.hexColor,
         },
         shiftColour: {
-          id: item.post.shiftColour.id,
           name: item.post.shiftColour.name,
-          hexColor: item.post.shiftColour.hexColor,
+          colour: item.post.shiftColour.hexColor,
         },
       },
-      application: {
-        id: item.application.id,
-        status: item.application.status,
-        requestType: item.application.requestType,
-        requestedStartTime: item.application.requestedStartTime,
-        requestedEndTime: item.application.requestedEndTime,
-        comment: item.application.comment,
-        cancellationRequestedReason: item.application.cancellationRequestedReason,
-      },
+      applicationId: item.application.id,
     }));
 
     return NextResponse.json(transformed);

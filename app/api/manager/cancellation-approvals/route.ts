@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
         orderBy: { cancellationRequestedAt: "desc" },
       });
     } else {
-      // Regular managers see only their assigned users
+      // Regular managers see cancellation requests for:
+      // 1. Users assigned to them (direct reports)
+      // 2. Areas assigned to them
       const managerAssignments = await prisma.managerAssignment.findMany({
         where: { managerId: user!.id },
         select: {
@@ -56,20 +58,39 @@ export async function GET(req: NextRequest) {
         return NextResponse.json([]);
       }
 
-      // Build query for applications
-      const whereClause: {
-        userId: { in: string[] };
-        status: string;
-      } = {
-        userId: {
-          in: managerAssignments.map((ma) => ma.userId),
-        },
-        status: "CANCEL_PENDING",
-      };
+      const assignedUserIds = managerAssignments
+        .filter((a) => a.userId)
+        .map((a) => a.userId);
+
+      const assignedAreaIds = managerAssignments
+        .filter((a) => a.areaId)
+        .map((a) => a.areaId);
+
+      // Build OR conditions
+      const orConditions: any[] = [];
+
+      if (assignedUserIds.length > 0) {
+        orConditions.push({ userId: { in: assignedUserIds } });
+      }
+
+      if (assignedAreaIds.length > 0) {
+        orConditions.push({
+          overtime: {
+            areaId: { in: assignedAreaIds },
+          },
+        });
+      }
+
+      if (orConditions.length === 0) {
+        return NextResponse.json([]);
+      }
 
       // Get applications
       applications = await prisma.overtimeApplication.findMany({
-        where: whereClause,
+        where: {
+          status: "CANCEL_PENDING",
+          OR: orConditions,
+        },
         include: {
           user: {
             select: {
@@ -89,19 +110,18 @@ export async function GET(req: NextRequest) {
         orderBy: { cancellationRequestedAt: "desc" },
       });
 
-      // Filter by manager's assignment scope (area/shift colour)
+      // Additional filtering for shift colour if specified in assignment
       applications = applications.filter((app) => {
-        const assignment = managerAssignments.find((ma) => {
-          if (ma.userId !== app.userId) return false;
-          if (ma.areaId && ma.areaId !== app.overtime.areaId) return false;
-          if (
-            ma.shiftColourId &&
-            ma.shiftColourId !== app.overtime.shiftColourId
-          )
-            return false;
-          return true;
-        });
-        return !!assignment;
+        // Check if there's a matching assignment
+        const hasUserAssignment = managerAssignments.some(
+          (ma) => ma.userId === app.userId
+        );
+        const hasAreaAssignment = managerAssignments.some(
+          (ma) =>
+            ma.areaId === app.overtime.areaId &&
+            (!ma.shiftColourId || ma.shiftColourId === app.overtime.shiftColourId)
+        );
+        return hasUserAssignment || hasAreaAssignment;
       });
     }
 
@@ -189,32 +209,41 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify manager is assigned to manage this user (skip for SUPER_ADMIN)
+    // Verify manager permission (skip for SUPER_ADMIN)
     if (user!.role !== "SUPER_ADMIN") {
-      const managerAssignment = await prisma.managerAssignment.findFirst({
+      // Check if manager is assigned to:
+      // 1. The user (direct report), OR
+      // 2. The area of the overtime
+      const managerAssignments = await prisma.managerAssignment.findMany({
         where: {
           managerId: user!.id,
-          userId: application.userId,
-          OR: [{ areaId: null }, { areaId: application.overtime.areaId }],
+          OR: [
+            // Assigned to the user
+            { userId: application.userId },
+            // Assigned to the area
+            { areaId: application.overtime.areaId },
+          ],
         },
       });
 
-      if (!managerAssignment) {
+      if (managerAssignments.length === 0) {
         return NextResponse.json(
-          { error: "You are not assigned to manage this user" },
+          { error: "You are not authorized to approve this cancellation. You must be assigned to either the user or the area." },
           { status: 403 }
         );
       }
 
-      // Additional check for shift colour
-      if (
-        managerAssignment.shiftColourId &&
-        managerAssignment.shiftColourId !== application.overtime.shiftColourId
-      ) {
-        return NextResponse.json(
-          { error: "You are not assigned to manage this shift colour" },
-          { status: 403 }
-        );
+      // If assigned by area, verify shift colour if specified
+      const areaAssignment = managerAssignments.find(
+        (ma) => ma.areaId === application.overtime.areaId
+      );
+      if (areaAssignment && areaAssignment.shiftColourId) {
+        if (areaAssignment.shiftColourId !== application.overtime.shiftColourId) {
+          return NextResponse.json(
+            { error: "You are not assigned to manage this shift colour in this area" },
+            { status: 403 }
+          );
+        }
       }
     }
 
