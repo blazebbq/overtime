@@ -10,6 +10,7 @@ import {
   UserGroupIcon,
   Cog8ToothIcon,
   WrenchScrewdriverIcon,
+  InboxIcon,
 } from "@heroicons/react/24/solid";
 
 type UserMenuDropdownProps = {
@@ -19,11 +20,34 @@ type UserMenuDropdownProps = {
 export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const isManager = userRole === "MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const isSuperAdmin = userRole === "SUPER_ADMIN";
+
+  // Fetch unread count for managers/admins
+  useEffect(() => {
+    if (isManager) {
+      fetchUnreadCount();
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isManager]);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await fetch("/api/inbox?status=UNREAD");
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.length);
+      }
+    } catch (error) {
+      console.error("Failed to fetch unread count:", error);
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -59,6 +83,13 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
       icon: ClipboardDocumentListIcon,
       href: "/dashboard/requests",
       show: true,
+    },
+    {
+      label: "Inbox",
+      icon: InboxIcon,
+      href: "/inbox",
+      show: isManager,
+      badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
       label: "Manager Approvals",
@@ -117,10 +148,17 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
               <button
                 key={item.href}
                 onClick={() => handleItemClick(item.href)}
-                className="text-zinc-300 hover:bg-zinc-700 hover:text-white group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition-colors"
+                className="text-zinc-300 hover:bg-zinc-700 hover:text-white group flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors"
               >
-                <item.icon className="mr-3 h-5 w-5" aria-hidden="true" />
-                {item.label}
+                <div className="flex items-center">
+                  <item.icon className="mr-3 h-5 w-5" aria-hidden="true" />
+                  {item.label}
+                </div>
+                {item.badge && (
+                  <span className="ml-auto bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {item.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>

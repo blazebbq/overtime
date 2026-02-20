@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { sendApplicationStatusEmail } from "@/lib/email";
+import { resolveInboxItems } from "@/lib/inbox";
 
 // GET - List cancellation requests needing approval
 export async function GET(req: NextRequest) {
@@ -276,6 +277,9 @@ export async function POST(req: Request) {
         }
       );
 
+      // Resolve inbox items for this cancellation request
+      await resolveInboxItems(applicationId, user!.id);
+
       return NextResponse.json(result);
     } else {
       // REJECT the cancellation - restore to APPROVED status
@@ -319,6 +323,9 @@ export async function POST(req: Request) {
           shiftHexColor: application.overtime.shiftColour.hexColor,
         }
       );
+
+      // Resolve inbox items for this cancellation request
+      await resolveInboxItems(applicationId, user!.id);
 
       return NextResponse.json(updatedApp);
     }

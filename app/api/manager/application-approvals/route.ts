@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireManager } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { sendApplicationStatusEmail } from "@/lib/email";
+import { resolveInboxItems } from "@/lib/inbox";
 
 // GET - List applications needing approval
 export async function GET(req: NextRequest) {
@@ -347,6 +348,9 @@ export async function POST(req: Request) {
         }
       );
 
+      // Resolve inbox items for this application
+      await resolveInboxItems(applicationId, user!.id);
+
       return NextResponse.json(result);
     } else {
       // REJECT action
@@ -397,6 +401,9 @@ export async function POST(req: Request) {
           rejectionReason,
         }
       );
+
+      // Resolve inbox items for this application
+      await resolveInboxItems(applicationId, user!.id);
 
       return NextResponse.json(updatedApp);
     }

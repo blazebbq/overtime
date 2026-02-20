@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { sendGenericEmail } from "@/lib/email";
+import { resolveInboxItems } from "@/lib/inbox";
 
 // POST - Admin/Manager cancels an approved application on behalf of user
 export async function POST(req: Request) {
@@ -153,6 +154,9 @@ export async function POST(req: Request) {
         console.error(`Failed to send cancellation email to ${email}:`, emailError);
       }
     }
+
+    // Resolve any inbox items related to this application
+    await resolveInboxItems(applicationId, user.id);
 
     return NextResponse.json({
       success: true,
