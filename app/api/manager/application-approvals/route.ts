@@ -3,6 +3,7 @@ import { requireManager } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { sendApplicationStatusEmail } from "@/lib/email";
 import { resolveInboxItems } from "@/lib/inbox";
+import { calculatePaySegments, parseDateTime } from "@/lib/payCalculation";
 
 // GET - List applications needing approval
 export async function GET(req: NextRequest) {
@@ -230,6 +231,36 @@ export async function POST(req: Request) {
             approverId: user!.id,
           },
         });
+
+        // Calculate pay segments for this approval
+        try {
+          const startDateTime = parseDateTime(
+            application.overtime.date.toISOString(),
+            approvedStartTime
+          );
+          const endDateTime = parseDateTime(
+            application.overtime.date.toISOString(),
+            approvedEndTime
+          );
+
+          const paySegments = calculatePaySegments(startDateTime, endDateTime);
+
+          // Create pay segment records
+          for (const segment of paySegments) {
+            await tx.overtimePaySegment.create({
+              data: {
+                applicationId: updatedApp.id,
+                segmentStart: segment.segmentStart,
+                segmentEnd: segment.segmentEnd,
+                hoursWorked: segment.hoursWorked,
+                multiplier: segment.multiplier,
+              },
+            });
+          }
+        } catch (payCalcError) {
+          console.error("Error calculating pay segments:", payCalcError);
+          // Continue even if pay calculation fails - don't block approval
+        }
 
         // Calculate new approved count
         const newApprovedCount = application.overtime.approvedCount + 1;
