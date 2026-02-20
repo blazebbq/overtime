@@ -26,7 +26,7 @@ export async function GET() {
     // For pending applications, find the assigned manager
     const applicationsWithManager = await Promise.all(
       applications.map(async (app) => {
-        if (app.status === "PENDING_APPROVAL") {
+        if (app.status === "PENDING_APPROVAL" || app.status === "CANCEL_PENDING") {
           // Find the manager assignment
           const managerAssignment = await prisma.managerAssignment.findFirst({
             where: {

@@ -273,7 +273,12 @@ export default function MyRequestsPage() {
                       </p>
                       {isPending && app.assignedManager && (
                         <p className="text-sm text-yellow-400 font-semibold mt-1">
-                          Pending approval from: {app.assignedManager.name}
+                          Waiting with: {app.assignedManager.name}
+                        </p>
+                      )}
+                      {isCancelPending && app.assignedManager && (
+                        <p className="text-sm text-orange-400 font-semibold mt-1">
+                          Waiting with: {app.assignedManager.name}
                         </p>
                       )}
                     </div>

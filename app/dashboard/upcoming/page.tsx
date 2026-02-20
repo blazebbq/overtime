@@ -12,6 +12,10 @@ type Application = {
   status: string;
   approvedStartTime: string | null;
   approvedEndTime: string | null;
+  assignedManager?: {
+    id: string;
+    name: string;
+  } | null;
   overtime: {
     id: string;
     date: string;
@@ -174,6 +178,7 @@ export default function UpcomingOvertimePage() {
             const textColor = getTextColor(bgColor);
             const displayStartTime = app.approvedStartTime || app.overtime.startTime;
             const displayEndTime = app.approvedEndTime || app.overtime.endTime;
+            const isCancelPending = app.status === "CANCEL_PENDING";
 
             return (
               <div
@@ -200,20 +205,35 @@ export default function UpcomingOvertimePage() {
                   </div>
                 </div>
 
-                <div className={`text-xs ${textColor} opacity-75 bg-white/20 rounded-lg p-2 mb-3`}>
-                  <span className="font-semibold">✓ APPROVED</span>
-                </div>
+                {isCancelPending ? (
+                  <>
+                    <div className={`text-xs ${textColor} opacity-75 bg-orange-600/80 rounded-lg p-2 mb-2`}>
+                      <span className="font-semibold">⏳ CANCELLATION PENDING</span>
+                    </div>
+                    {app.assignedManager && (
+                      <div className={`text-xs ${textColor} opacity-75 bg-white/20 rounded-lg p-2 mb-3`}>
+                        <span className="font-semibold">Waiting with: {app.assignedManager.name}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className={`text-xs ${textColor} opacity-75 bg-white/20 rounded-lg p-2 mb-3`}>
+                      <span className="font-semibold">✓ APPROVED</span>
+                    </div>
 
-                <button
-                  onClick={() => {
-                    setSelectedApplicationId(app.id);
-                    setSelectedApplication(app);
-                    setShowCancellationRequestModal(true);
-                  }}
-                  className="w-full py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold transition-colors shadow-lg"
-                >
-                  Request Cancellation
-                </button>
+                    <button
+                      onClick={() => {
+                        setSelectedApplicationId(app.id);
+                        setSelectedApplication(app);
+                        setShowCancellationRequestModal(true);
+                      }}
+                      className="w-full py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold transition-colors shadow-lg"
+                    >
+                      Request Cancellation
+                    </button>
+                  </>
+                )}
               </div>
             );
           })}
