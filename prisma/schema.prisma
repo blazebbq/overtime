@@ -84,6 +84,21 @@ model UserShiftPattern {
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   shiftPattern ShiftPattern @relation(fields: [shiftPatternId], references: [id])
+  dailyPatterns UserShiftDayPattern[]
+}
+
+// Per-day shift type for detailed tracking
+model UserShiftDayPattern {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  dayType   String   // DDE | DDL | 12N | 8N | 12D | D | OFF
+  createdAt DateTime @default(now())
+
+  userPattern UserShiftPattern @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
 
 model ManagerAssignment {
@@ -116,6 +131,7 @@ model OvertimeRequest {
 
   // Lifecycle
   status             String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
+  archived           Boolean  @default(false) // Auto-archived after 5 days
 
   createdAt          DateTime @default(now())
 
@@ -174,10 +190,26 @@ model OvertimeApplication {
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   overtime           OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
   inboxItems         InboxItem[]
+  paySegments        OvertimePaySegment[]
   
   // Removed unique constraint to allow reapplication after rejection/cancellation
   @@index([userId, overtimeId])
   @@index([overtimeId, status])
+}
+
+// Pay multiplier segments for accurate compensation calculation
+model OvertimePaySegment {
+  id            String   @id @default(cuid())
+  applicationId String
+  segmentStart  DateTime // Start time of this pay segment
+  segmentEnd    DateTime // End time of this pay segment
+  hoursWorked   Float    // Duration in hours
+  multiplier    Float    // Pay multiplier (1.5, 1.75, or 2.0)
+  createdAt     DateTime @default(now())
+
+  application OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
 }
 
 model OvertimeApproval {
