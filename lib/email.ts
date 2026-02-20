@@ -442,3 +442,42 @@ export function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
+
+// Generic email sender for admin actions
+export async function sendGenericEmail(
+  to: string | string[],
+  subject: string,
+  html: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const transport = getTransporter();
+    
+    const recipients = Array.isArray(to) ? to : [to];
+    
+    const info = await transport.sendMail({
+      from: fromEmail,
+      to: recipients.join(", "),
+      subject,
+      html,
+    });
+
+    console.log("[Email] Sent generic email:", {
+      messageId: info.messageId,
+      recipients,
+      subject,
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Email] Failed to send generic email:", {
+      error: errorMsg,
+      subject,
+    });
+
+    return {
+      success: false,
+      error: errorMsg,
+    };
+  }
+}

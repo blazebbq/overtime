@@ -53,6 +53,9 @@ export default function OvertimePostApplicationsPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedApplicationForCancel, setSelectedApplicationForCancel] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -138,6 +141,42 @@ export default function OvertimePostApplicationsPage({
         throw new Error(data.error || "Failed to reject application");
       }
 
+      await loadPost();
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleCancelOvertimeForUser = async () => {
+    if (!selectedApplicationForCancel || !cancelReason.trim()) {
+      setError("Please provide a cancellation reason");
+      return;
+    }
+
+    setProcessingId(selectedApplicationForCancel);
+    setError(null);
+    
+    try {
+      const res = await fetch("/api/admin/cancel-application", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: selectedApplicationForCancel,
+          reason: cancelReason,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to cancel application");
+      }
+
+      setShowCancelModal(false);
+      setSelectedApplicationForCancel(null);
+      setCancelReason("");
       await loadPost();
     } catch (err) {
       const error = err as Error;
@@ -314,9 +353,21 @@ export default function OvertimePostApplicationsPage({
                       <div className="font-bold text-white">{app.user.name}</div>
                       <div className="text-sm text-zinc-400">{app.user.email}</div>
                     </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-600 text-white">
-                      ✓ APPROVED
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-600 text-white">
+                        ✓ APPROVED
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSelectedApplicationForCancel(app.id);
+                          setShowCancelModal(true);
+                        }}
+                        disabled={processingId === app.id}
+                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                      >
+                        Cancel Overtime
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -351,6 +402,61 @@ export default function OvertimePostApplicationsPage({
           </div>
         )}
       </main>
+
+      {/* Cancel Application Modal */}
+      {showCancelModal && selectedApplicationForCancel && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-800 rounded-2xl p-6 max-w-lg w-full border-2 border-zinc-700">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Cancel Overtime Assignment
+            </h2>
+
+            <p className="text-zinc-300 mb-4">
+              Please provide a reason for cancelling this user's overtime assignment. The user will be notified via email.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-white font-semibold mb-2">
+                Cancellation Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Explain why this overtime assignment is being cancelled..."
+                className="w-full px-4 py-2 bg-zinc-700 text-white rounded-lg border border-zinc-600 focus:border-blue-500 focus:outline-none"
+                rows={4}
+              />
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-lg text-red-200 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setSelectedApplicationForCancel(null);
+                  setCancelReason("");
+                }}
+                disabled={processingId === selectedApplicationForCancel}
+                className="flex-1 py-3 rounded-xl bg-zinc-600 hover:bg-zinc-700 text-white font-bold transition-colors disabled:opacity-50"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleCancelOvertimeForUser}
+                disabled={!cancelReason.trim() || processingId === selectedApplicationForCancel}
+                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold transition-colors disabled:opacity-50"
+              >
+                {processingId === selectedApplicationForCancel ? "Cancelling..." : "Confirm Cancellation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
