@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
+import { createInboxItem } from "@/lib/inbox";
 
 // GET - List applications (for current user or admin)
 export async function GET(req: NextRequest) {
@@ -210,6 +211,16 @@ export async function POST(req: Request) {
           comment,
         }),
       },
+    });
+
+    // Create inbox item for approver
+    await createInboxItem({
+      type: "APPLICATION_REQUEST",
+      postId: overtimeId,
+      applicationId: application.id,
+      requesterUserId: user.id,
+      areaId: overtime.areaId,
+      shiftColourId: overtime.shiftColourId,
     });
 
     return NextResponse.json(application);

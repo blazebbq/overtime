@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { sendApplicationStatusEmail } from "@/lib/email";
+import { createInboxItem } from "@/lib/inbox";
 
 // POST - Cancel an application
 export async function POST(req: Request) {
@@ -182,6 +183,16 @@ export async function POST(req: Request) {
           cancellationReason,
         }
       );
+
+      // Create inbox item for approver to review cancellation request
+      await createInboxItem({
+        type: "CANCELLATION_REQUEST",
+        postId: application.overtimeId,
+        applicationId: application.id,
+        requesterUserId: user.id,
+        areaId: application.overtime.areaId,
+        shiftColourId: application.overtime.shiftColourId,
+      });
 
       return NextResponse.json(updatedApp);
     }
