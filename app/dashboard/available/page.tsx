@@ -30,6 +30,10 @@ type Overtime = {
   userApplication?: {
     id: string;
     status: string;
+    assignedManager?: {
+      id: string;
+      name: string;
+    } | null;
   };
   acceptedWorkers?: Array<{
     name: string;
@@ -435,6 +439,11 @@ export default function AvailableOvertimePage() {
                     <div className="w-full py-3 px-4 rounded-xl bg-yellow-500 text-white font-bold text-center">
                       ⏳ Pending Approval
                     </div>
+                    {userApplication.assignedManager && (
+                      <div className={`text-xs ${textColor} bg-white bg-opacity-20 rounded-lg p-2 text-center`}>
+                        <span className="font-semibold">Waiting with: {userApplication.assignedManager.name}</span>
+                      </div>
+                    )}
                     <button
                       onClick={() => handleCancelRequest(userApplication.id)}
                       className="w-full py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors"
@@ -459,8 +468,15 @@ export default function AvailableOvertimePage() {
                     </button>
                   </div>
                 ) : applicationStatus === "CANCEL_PENDING" ? (
-                  <div className="w-full py-3 px-4 rounded-xl bg-orange-500 text-white font-bold text-center">
-                    ⚠️ Cancellation Pending
+                  <div className="space-y-2">
+                    <div className="w-full py-3 px-4 rounded-xl bg-orange-500 text-white font-bold text-center">
+                      ⚠️ Cancellation Pending
+                    </div>
+                    {userApplication && userApplication.assignedManager && (
+                      <div className={`text-xs ${textColor} bg-white bg-opacity-20 rounded-lg p-2 text-center`}>
+                        <span className="font-semibold">Waiting with: {userApplication.assignedManager.name}</span>
+                      </div>
+                    )}
                   </div>
                 ) : applicationStatus === "REJECTED_MANUAL" || applicationStatus === "REJECTED_CAPACITY" ? (
                   <div className="space-y-2">

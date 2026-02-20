@@ -58,18 +58,47 @@ export async function GET(req: NextRequest) {
   });
 
   // Transform data to include userApplication separately and accepted workers
-  const overtimeWithUserApp = overtime.map(ot => {
+  const overtimeWithUserApp = await Promise.all(overtime.map(async (ot) => {
     const userApplication = user 
       ? ot.applications.find(app => app.userId === user.id)
       : undefined;
     
     const approvedApps = ot.applications.filter(app => app.status === "APPROVED");
     
+    // For pending or cancellation pending applications, find assigned manager
+    let assignedManager = null;
+    if (userApplication && (userApplication.status === "PENDING_APPROVAL" || userApplication.status === "CANCEL_PENDING") && user) {
+      const managerAssignment = await prisma.managerAssignment.findFirst({
+        where: {
+          userId: user.id,
+          OR: [
+            { areaId: null },
+            { areaId: ot.areaId },
+          ],
+        },
+        include: {
+          manager: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          // Prefer specific area assignments over global ones
+          areaId: "desc",
+        },
+      });
+      
+      assignedManager = managerAssignment?.manager || null;
+    }
+    
     return {
       ...ot,
       userApplication: userApplication ? {
         id: userApplication.id,
         status: userApplication.status,
+        assignedManager,
       } : undefined,
       // Keep applications as approved only for display
       applications: approvedApps,
@@ -78,7 +107,7 @@ export async function GET(req: NextRequest) {
         name: app.user.name,
       })),
     };
-  });
+  }));
 
   // Apply filters based on approvedCount (new model)
   let filteredOvertime = overtimeWithUserApp;
