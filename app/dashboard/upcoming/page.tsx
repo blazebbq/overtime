@@ -8,6 +8,7 @@ import Header from "../../components/Header";
 
 type Application = {
   id: string;
+  status: string;
   approvedStartTime: string | null;
   approvedEndTime: string | null;
   overtime: {
@@ -56,6 +57,9 @@ export default function UpcomingOvertimePage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCancellationRequestModal, setShowCancellationRequestModal] = useState(false);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -82,6 +86,42 @@ export default function UpcomingOvertimePage() {
       setError("Failed to load upcoming overtime");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRequestCancellation = async () => {
+    if (!selectedApplicationId) return;
+    
+    if (!cancellationReason.trim()) {
+      setError("Please provide a reason for cancellation");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/applications/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId: selectedApplicationId,
+          reason: cancellationReason,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to request cancellation");
+      }
+
+      setShowCancellationRequestModal(false);
+      setSelectedApplicationId(null);
+      setCancellationReason("");
+      await loadUpcoming(); // Refresh to get updated list
+      alert("Cancellation request submitted successfully! You will receive an email when it's reviewed.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Failed to request cancellation:", error);
+      setError(error.message || "Failed to request cancellation");
     }
   };
 
@@ -171,14 +211,79 @@ export default function UpcomingOvertimePage() {
                   </div>
                 </div>
 
-                <div className={`text-xs ${textColor} opacity-75 bg-white/20 rounded-lg p-2`}>
+                <div className={`text-xs ${textColor} opacity-75 bg-white/20 rounded-lg p-2 mb-3`}>
                   <span className="font-semibold">✓ APPROVED</span>
                 </div>
+
+                <button
+                  onClick={() => {
+                    setSelectedApplicationId(app.id);
+                    setShowCancellationRequestModal(true);
+                  }}
+                  className="w-full py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold transition-colors shadow-lg"
+                >
+                  Request Cancellation
+                </button>
               </div>
             );
           })}
         </div>
       </main>
+
+      {/* Cancellation Request Modal */}
+      {showCancellationRequestModal && selectedApplicationId && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-800 rounded-2xl p-6 max-w-lg w-full border-2 border-zinc-700">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Request Cancellation
+            </h2>
+
+            <p className="text-zinc-300 mb-4">
+              Please provide a reason for your cancellation request. This will be reviewed by your manager.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-white font-semibold mb-2">
+                Reason for Cancellation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="Please explain why you need to cancel this approved overtime..."
+                className="w-full px-4 py-2 bg-zinc-700 text-white rounded-lg border border-zinc-600 focus:border-blue-500 focus:outline-none"
+                rows={4}
+              />
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-lg text-red-200 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCancellationRequestModal(false);
+                  setSelectedApplicationId(null);
+                  setCancellationReason("");
+                  setError(null);
+                }}
+                className="flex-1 py-3 rounded-xl bg-zinc-600 hover:bg-zinc-700 text-white font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRequestCancellation}
+                disabled={!cancellationReason.trim()}
+                className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold transition-colors disabled:opacity-50"
+              >
+                Submit Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

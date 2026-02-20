@@ -26,11 +26,10 @@ type Overtime = {
   approvedCount: number;
   area: Area;
   shiftColour: ShiftColour;
-  applications: Array<{
+  userApplication?: {
     id: string;
-    userId: string;
     status: string;
-  }>;
+  };
 };
 
 function getTextColor(hexColor: string): string {
@@ -73,6 +72,10 @@ export default function AvailableOvertimePage() {
   const [partialEndTime, setPartialEndTime] = useState("");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  const [showCancellationRequestModal, setShowCancellationRequestModal] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -214,7 +217,7 @@ export default function AvailableOvertimePage() {
       }
 
       closeApplicationModal();
-      loadOvertime();
+      await loadOvertime(); // Refresh to get updated status
       alert("Application submitted successfully! You will receive an email when it's reviewed.");
     } catch (err: unknown) {
       const error = err as Error;
@@ -222,6 +225,67 @@ export default function AvailableOvertimePage() {
       setError(error.message || "Failed to submit application");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCancelRequest = async (applicationId: string) => {
+    if (!confirm("Are you sure you want to cancel this application?")) {
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/applications/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to cancel application");
+      }
+
+      await loadOvertime(); // Refresh to get updated status
+      alert("Application cancelled successfully!");
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Failed to cancel application:", error);
+      setError(error.message || "Failed to cancel application");
+    }
+  };
+
+  const handleRequestCancellation = async (applicationId: string) => {
+    if (!cancellationReason.trim()) {
+      setError("Please provide a reason for cancellation");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/applications/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          reason: cancellationReason,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to request cancellation");
+      }
+
+      setShowCancellationRequestModal(false);
+      setSelectedApplicationId(null);
+      setCancellationReason("");
+      await loadOvertime(); // Refresh to get updated status
+      alert("Cancellation request submitted successfully! You will receive an email when it's reviewed.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Failed to request cancellation:", error);
+      setError(error.message || "Failed to request cancellation");
     }
   };
 
@@ -300,9 +364,8 @@ export default function AvailableOvertimePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {overtime.map((ot) => {
-            const userId = (session?.user as { id?: string })?.id;
-            const userApplication = ot.applications.find(app => app.userId === userId);
-            const hasApplied = !!userApplication;
+            const userApplication = ot.userApplication;
+            const applicationStatus = userApplication?.status;
             const isFull = ot.approvedCount >= ot.requiredPeople;
 
             const bgColor = ot.shiftColour.hexColor;
@@ -347,9 +410,81 @@ export default function AvailableOvertimePage() {
                   )}
                 </div>
 
-                {hasApplied ? (
-                  <div className="w-full py-3 px-4 rounded-xl bg-yellow-500 text-white font-bold text-center">
-                    ⏳ Application Pending
+                {/* Show different states based on application status */}
+                {applicationStatus === "PENDING_APPROVAL" && userApplication ? (
+                  <div className="space-y-2">
+                    <div className="w-full py-3 px-4 rounded-xl bg-yellow-500 text-white font-bold text-center">
+                      ⏳ Pending Approval
+                    </div>
+                    <button
+                      onClick={() => handleCancelRequest(userApplication.id)}
+                      className="w-full py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors"
+                    >
+                      Cancel Request
+                    </button>
+                  </div>
+                ) : applicationStatus === "APPROVED" && userApplication ? (
+                  <div className="space-y-2">
+                    <div className="w-full py-3 px-4 rounded-xl bg-green-600 text-white font-bold text-center">
+                      ✓ Approved
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedApplicationId(userApplication.id);
+                        setShowCancellationRequestModal(true);
+                      }}
+                      className="w-full py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold transition-colors"
+                    >
+                      Request Cancellation
+                    </button>
+                  </div>
+                ) : applicationStatus === "CANCEL_PENDING" ? (
+                  <div className="w-full py-3 px-4 rounded-xl bg-orange-500 text-white font-bold text-center">
+                    ⚠️ Cancellation Pending
+                  </div>
+                ) : applicationStatus === "REJECTED_MANUAL" || applicationStatus === "REJECTED_CAPACITY" ? (
+                  <div className="space-y-2">
+                    <div className="w-full py-3 px-4 rounded-xl bg-red-500 text-white font-bold text-center">
+                      ✗ Rejected
+                    </div>
+                    {!isFull && (
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => openApplicationModal(ot.id, "FULL")}
+                          className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+                        >
+                          Apply Again (Full Shift)
+                        </button>
+                        <button
+                          onClick={() => openApplicationModal(ot.id, "PARTIAL")}
+                          className="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
+                        >
+                          Apply Again (Different Hours)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : applicationStatus === "CANCELLED" ? (
+                  <div className="space-y-2">
+                    <div className="w-full py-3 px-4 rounded-xl bg-gray-500 text-white font-bold text-center">
+                      ✗ Cancelled
+                    </div>
+                    {!isFull && (
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => openApplicationModal(ot.id, "FULL")}
+                          className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+                        >
+                          Apply Again (Full Shift)
+                        </button>
+                        <button
+                          onClick={() => openApplicationModal(ot.id, "PARTIAL")}
+                          className="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
+                        >
+                          Apply Again (Different Hours)
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : isFull ? (
                   <div className="w-full py-3 px-4 rounded-xl bg-gray-500 text-white font-bold text-center">
@@ -457,6 +592,60 @@ export default function AvailableOvertimePage() {
                 className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors disabled:opacity-50"
               >
                 {submitting ? "Submitting..." : "Submit Application"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancellation Request Modal */}
+      {showCancellationRequestModal && selectedApplicationId && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-800 rounded-2xl p-6 max-w-lg w-full border-2 border-zinc-700">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Request Cancellation
+            </h2>
+
+            <p className="text-zinc-300 mb-4">
+              Please provide a reason for your cancellation request. This will be reviewed by your manager.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-white font-semibold mb-2">
+                Reason for Cancellation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="Please explain why you need to cancel this approved overtime..."
+                className="w-full px-4 py-2 bg-zinc-700 text-white rounded-lg border border-zinc-600 focus:border-blue-500 focus:outline-none"
+                rows={4}
+              />
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-lg text-red-200 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCancellationRequestModal(false);
+                  setSelectedApplicationId(null);
+                  setCancellationReason("");
+                }}
+                className="flex-1 py-3 rounded-xl bg-zinc-600 hover:bg-zinc-700 text-white font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRequestCancellation(selectedApplicationId)}
+                disabled={!cancellationReason.trim()}
+                className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold transition-colors disabled:opacity-50"
+              >
+                Submit Request
               </button>
             </div>
           </div>

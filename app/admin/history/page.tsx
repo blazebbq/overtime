@@ -38,6 +38,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [showReportView, setShowReportView] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -237,14 +238,22 @@ export default function HistoryPage() {
           </div>
 
           {/* Search Button */}
-          <button
-            onClick={handleSearch}
-            disabled={loading || selectedUsers.length === 0}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <MagnifyingGlassIcon className="w-5 h-5" />
-            {loading ? "Searching..." : "Search"}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleSearch}
+              disabled={loading || selectedUsers.length === 0}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MagnifyingGlassIcon className="w-5 h-5" />
+              {loading ? "Searching..." : "Search"}
+            </button>
+            <button
+              onClick={() => setShowReportView(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors"
+            >
+              View Report
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -330,6 +339,128 @@ export default function HistoryPage() {
           </div>
         )}
       </main>
+
+      {/* Report View Modal */}
+      {showReportView && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-800 rounded-2xl p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto border-2 border-zinc-700">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">
+                Overtime History Report
+              </h2>
+              <button
+                onClick={() => setShowReportView(false)}
+                className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            {history.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📊</div>
+                <p className="text-zinc-400 text-lg">
+                  No overtime records found for selected criteria
+                </p>
+                <p className="text-zinc-500 text-sm mt-2">
+                  Please adjust your search filters and try again
+                </p>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4 p-4 bg-zinc-700 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-zinc-400">Total Records:</span>
+                      <span className="ml-2 text-white font-bold">{history.length}</span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-400">Export Date:</span>
+                      <span className="ml-2 text-white font-bold">
+                        {new Date().toLocaleDateString()}
+                      </span>
+                    </div>
+                    {dateFrom && (
+                      <div>
+                        <span className="text-zinc-400">From:</span>
+                        <span className="ml-2 text-white font-bold">
+                          {new Date(dateFrom).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    {dateTo && (
+                      <div>
+                        <span className="text-zinc-400">To:</span>
+                        <span className="ml-2 text-white font-bold">
+                          {new Date(dateTo).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-zinc-400 uppercase bg-zinc-700">
+                      <tr>
+                        <th className="px-4 py-3">User</th>
+                        <th className="px-4 py-3">Area</th>
+                        <th className="px-4 py-3">Shift</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3">Hours</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Approved By</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((record) => (
+                        <tr
+                          key={record.id}
+                          className="border-b border-zinc-700 hover:bg-zinc-700/50"
+                        >
+                          <td className="px-4 py-3 text-white">
+                            {record.userName}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-300">{record.area}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: record.shiftHexColor }}
+                              />
+                              <span className="text-zinc-300">{record.shiftColour}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-300">
+                            {new Date(record.date).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-300">
+                            {record.startTime} – {record.endTime} ({record.hours}h)
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-bold ${
+                                record.status === "APPROVED"
+                                  ? "bg-green-600 text-white"
+                                  : "bg-yellow-600 text-white"
+                              }`}
+                            >
+                              {record.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-300">
+                            {record.approvedBy || "–"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
