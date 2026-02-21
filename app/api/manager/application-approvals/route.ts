@@ -209,13 +209,14 @@ export async function POST(req: Request) {
         );
       }
 
-      // Check if overtime is still open
+      // Log if approving beyond required slots (but don't block)
       if (
         application.overtime.approvedCount >= application.overtime.requiredPeople
       ) {
-        return NextResponse.json(
-          { error: "This overtime slot is already fully staffed" },
-          { status: 400 }
+        console.log(
+          `Over-slot approval: Approving application ${applicationId} for overtime ${application.overtime.id}. ` +
+          `Current: ${application.overtime.approvedCount}/${application.overtime.requiredPeople}. ` +
+          `Approved by: ${user!.name} (${user!.id})`
         );
       }
 

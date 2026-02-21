@@ -33,6 +33,8 @@ type Application = {
       name: string;
       hexColor: string;
     };
+    approvedCount?: number;
+    requiredPeople?: number;
   };
 };
 
@@ -82,6 +84,19 @@ export default function ManagerApprovalsPage() {
   };
 
   const handleApprove = async (applicationId: string, overtime: Application["overtime"]) => {
+    // Check if approving would exceed required slots
+    if (overtime.approvedCount !== undefined && overtime.requiredPeople !== undefined) {
+      if (overtime.approvedCount >= overtime.requiredPeople) {
+        const confirmed = window.confirm(
+          `This will exceed required slots (${overtime.approvedCount + 1}/${overtime.requiredPeople}).\n\n` +
+          `Do you want to approve anyway?`
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+    }
+    
     setProcessingId(applicationId);
     setError(null);
     
