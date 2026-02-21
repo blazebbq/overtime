@@ -100,7 +100,7 @@ export default function InboxPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           applicationId,
-          action: "approve",
+          action: "APPROVE",
         }),
       });
 
@@ -130,7 +130,7 @@ export default function InboxPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           applicationId,
-          action: "reject",
+          action: "REJECT",
         }),
       });
 
