@@ -169,7 +169,7 @@ model OvertimeApplication {
   comment            String?   // Optional user comment
   
   // Approval status
-  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED_MANUAL | REJECTED_CAPACITY | CANCEL_PENDING | CANCELLED
+  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED_MANUAL | REJECTED_CAPACITY | CANCEL_PENDING | CANCELLED | WITHDRAWN
   
   // Approval details (filled when status changes)
   approvedStartTime  String?   // Manager-approved start time

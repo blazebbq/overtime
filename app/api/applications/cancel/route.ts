@@ -85,14 +85,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // PENDING applications can be cancelled immediately
+    // PENDING applications can be withdrawn immediately
     if (application.status === "PENDING_APPROVAL") {
       const updatedApp = await prisma.overtimeApplication.update({
         where: { id: applicationId },
         data: {
-          status: "CANCELLED",
+          status: "WITHDRAWN",
           cancellationApprovedAt: new Date(),
-          // For self-cancellation of pending apps, leave approvedById null since no approval was needed
+          // For self-withdrawal of pending apps, leave approvedById null since no approval was needed
           cancellationApprovedById: null,
         },
       });
@@ -100,16 +100,16 @@ export async function POST(req: Request) {
       // Create audit log
       await prisma.auditLog.create({
         data: {
-          action: "APPLICATION_CANCELLED",
+          action: "APPLICATION_WITHDRAWN",
           entityType: "OvertimeApplication",
           entityId: applicationId,
           creatorId: user.id,
           affectedUserId: user.id,
           changes: JSON.stringify({
             previousStatus: "PENDING_APPROVAL",
-            newStatus: "CANCELLED",
+            newStatus: "WITHDRAWN",
             immediate: true,
-            selfCancelled: true,
+            selfWithdrawn: true,
           }),
         },
       });
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
           secondary: application.user.secondaryEmail,
         },
         application.user.name,
-        "CANCELLED",
+        "WITHDRAWN",
         {
           date: new Date(application.overtime.date).toDateString(),
           area: application.overtime.area.name,
