@@ -32,6 +32,7 @@ export type ApplicationStatus =
   | "REJECTED_MANUAL" 
   | "REJECTED_CAPACITY"
   | "CANCELLED"
+  | "WITHDRAWN"
   | "CANCEL_PENDING"
   | "CANCELLATION_APPROVED"
   | "CANCELLATION_REJECTED";
@@ -382,6 +383,10 @@ export async function sendApplicationStatusEmail(
       case "CANCELLED":
         subject = "Application Cancelled";
         html = getApplicationCancelledEmailHtml(userName, details);
+        break;
+      case "WITHDRAWN":
+        subject = "Application Withdrawn";
+        html = getApplicationCancelledEmailHtml(userName, details); // Reuse cancelled template
         break;
       case "CANCEL_PENDING":
         subject = "Cancellation Request Submitted";
