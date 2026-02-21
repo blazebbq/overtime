@@ -522,6 +522,28 @@ export default function AvailableOvertimePage() {
                       </div>
                     )}
                   </div>
+                ) : applicationStatus === "WITHDRAWN" ? (
+                  // WITHDRAWN applications show normal apply buttons (not "Apply Again")
+                  !isFull ? (
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => openApplicationModal(ot.id, "FULL")}
+                        className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all hover:shadow-lg"
+                      >
+                        ✓ Apply for Full Shift
+                      </button>
+                      <button
+                        onClick={() => openApplicationModal(ot.id, "PARTIAL")}
+                        className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition-all hover:shadow-lg"
+                      >
+                        ⏱ Apply with Different Hours
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full py-3 px-4 rounded-xl bg-gray-500 text-white font-bold text-center">
+                      Fully Staffed
+                    </div>
+                  )
                 ) : isFull ? (
                   <div className="w-full py-3 px-4 rounded-xl bg-gray-500 text-white font-bold text-center">
                     Fully Staffed

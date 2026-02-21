@@ -225,8 +225,8 @@ export default function OvertimeDashboard() {
     return overtimes.filter((ot) => {
       const app = ot.userApplication;
       
-      // Available overtime (no application or rejected/cancelled)
-      const isAvailable = !app || app.status === "REJECTED_MANUAL" || app.status === "REJECTED_CAPACITY" || app.status === "CANCELLED";
+      // Available overtime (no application or rejected/cancelled/withdrawn)
+      const isAvailable = !app || app.status === "REJECTED_MANUAL" || app.status === "REJECTED_CAPACITY" || app.status === "CANCELLED" || app.status === "WITHDRAWN";
       
       // My approved
       const isMyApproved = app?.status === "APPROVED";
@@ -266,6 +266,8 @@ export default function OvertimeDashboard() {
         return <span className="px-2 py-1 bg-red-600 text-white text-xs rounded">Rejected</span>;
       case "CANCELLED":
         return <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded">Cancelled</span>;
+      case "WITHDRAWN":
+        return <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded">Withdrawn</span>;
       default:
         return null;
     }
@@ -523,6 +525,28 @@ export default function OvertimeDashboard() {
                                 </button>
                               </div>
                             )}
+                          </div>
+                        );
+                      } else if (applicationStatus === "WITHDRAWN") {
+                        // WITHDRAWN applications should show normal apply buttons (not "Apply Again")
+                        return !isFull ? (
+                          <div className="space-y-2">
+                            <button
+                              onClick={() => openApplicationModal(ot.id, "FULL")}
+                              className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors text-sm"
+                            >
+                              ✓ Apply for Full Shift
+                            </button>
+                            <button
+                              onClick={() => openApplicationModal(ot.id, "PARTIAL")}
+                              className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors text-sm"
+                            >
+                              ⏱ Apply with Different Hours
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-full py-2 px-3 rounded-lg bg-gray-500 text-white font-semibold text-center text-sm">
+                            Fully Staffed
                           </div>
                         );
                       } else if (isFull) {
