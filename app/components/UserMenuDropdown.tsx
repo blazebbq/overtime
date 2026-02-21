@@ -67,21 +67,21 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
 
   const menuItems = [
     {
-      label: "My Overtime",
+      label: "Overtime Dashboard",
       icon: CalendarIcon,
-      href: "/dashboard",
+      href: "/overtime-dashboard",
       show: true,
     },
     {
-      label: "Available Overtime",
+      label: "Shift Patterns",
       icon: ClockIcon,
-      href: "/dashboard/available",
+      href: "/shift-patterns",
       show: true,
     },
     {
-      label: "My Requests",
-      icon: ClipboardDocumentListIcon,
-      href: "/dashboard/requests",
+      label: "Shift Forecast",
+      icon: CalendarIcon,
+      href: "/shift-patterns/forecast",
       show: true,
     },
     {

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
 // GET - Fetch user's shift pattern
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 // POST - Save/update shift pattern for user
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
         const newPattern = await prisma.shiftPattern.create({
           data: {
             name: "Default Pattern",
-            cycleDays: 7,
-            enabled: true,
+            cycleLength: 7,
+            patternData: JSON.stringify({ days: [true, true, true, true, true, true, true] }),
           },
         });
         userPattern = await prisma.userShiftPattern.create({

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
 // GET - Get forecast for a specific month
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
