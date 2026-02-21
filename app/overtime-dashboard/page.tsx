@@ -16,7 +16,7 @@ type Overtime = {
   requiredPeople: number;
   approvedCount: number;
   status: string;
-  acceptedWorkers: string[];
+  acceptedWorkers: { name: string }[];
   userApplication?: {
     id: string;
     status: string;
@@ -364,41 +364,55 @@ export default function OvertimeDashboard() {
                     borderColor: bgColor,
                   }}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className={`font-bold text-lg ${textColor}`}>
-                      {new Date(ot.date).toLocaleDateString()}
-                    </div>
-                    {getStatusBadge(ot)}
+                  {/* SHIFT COLOUR NAME - Large Bold Text at Top */}
+                  <div className={`font-bold text-2xl mb-3 ${textColor} uppercase`}>
+                    {ot.areaShiftColour?.shiftColour.name || ot.shiftColour?.name}
                   </div>
 
-                  <div className={`mb-2 ${textColor} opacity-90`}>
-                    {ot.areaShiftColour?.area.name || ot.area?.name} - {ot.areaShiftColour?.shiftColour.name || ot.shiftColour?.name}
+                  {/* Full Date Format */}
+                  <div className={`font-semibold text-lg mb-2 ${textColor}`}>
+                    {new Date(ot.date).toLocaleDateString("en-GB", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric"
+                    })}
                   </div>
 
-                  <div className={`text-sm mb-2 ${textColor} opacity-80`}>
-                    {ot.startTime} - {ot.endTime}
+                  {/* Area Name */}
+                  <div className={`mb-2 ${textColor} opacity-90 font-semibold`}>
+                    {ot.areaShiftColour?.area.name || ot.area?.name}
                   </div>
 
-                  <div className={`text-sm mb-2 ${textColor} opacity-90 font-semibold`}>
+                  {/* Time Range */}
+                  <div className={`text-sm mb-3 ${textColor} opacity-80`}>
+                    {ot.startTime} – {ot.endTime}
+                  </div>
+
+                  {/* Slots */}
+                  <div className={`text-sm mb-3 ${textColor} opacity-90 font-semibold`}>
                     Slots: {ot.approvedCount}/{ot.requiredPeople}
                     {ot.approvedCount >= ot.requiredPeople && " (FULL)"}
                   </div>
 
-                  {ot.acceptedWorkers && ot.acceptedWorkers.length > 0 && (
-                    <div className={`mt-2 pt-2 border-t ${textColor} opacity-30`}>
-                      <div className={`text-xs mb-1 ${textColor} opacity-90 font-semibold`}>Accepted:</div>
+                  {/* Accepted Users */}
+                  <div className={`mb-3 ${textColor}`}>
+                    <div className={`text-sm mb-1 ${textColor} opacity-90 font-semibold`}>Accepted:</div>
+                    {ot.acceptedWorkers && ot.acceptedWorkers.length > 0 ? (
                       <div className={`text-sm flex flex-wrap gap-1 ${textColor}`}>
                         {ot.acceptedWorkers.map((worker, idx) => (
                           <span key={idx} className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
-                            {worker}
+                            {worker.name}
                           </span>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className={`text-sm ${textColor} opacity-75 italic`}>None yet</div>
+                    )}
+                  </div>
 
                   {ot.userApplication?.assignedManager && (
-                    <div className={`mt-2 pt-2 border-t ${textColor} opacity-30`}>
+                    <div className={`mb-3 ${textColor}`}>
                       <div className={`text-xs ${textColor} opacity-90`}>
                         Waiting with: {ot.userApplication.assignedManager.name}
                       </div>
@@ -645,7 +659,6 @@ export default function OvertimeDashboard() {
                   date: new Date(selectedCancellationOvertime.date).toDateString(),
                   area: selectedCancellationOvertime.area.name,
                   shiftColour: selectedCancellationOvertime.shiftColour.name,
-                  time: `${selectedCancellationOvertime.startTime} - ${selectedCancellationOvertime.endTime}`,
                 }
               : undefined
           }
