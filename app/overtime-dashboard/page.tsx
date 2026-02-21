@@ -21,6 +21,9 @@ type Overtime = {
     id: string;
     status: string;
     assignedManager?: { name: string };
+    cancellationRequestedReason?: string;
+    cancellationRequestedAt?: string;
+    user?: { name: string };
   };
 };
 
@@ -475,6 +478,15 @@ export default function OvertimeDashboard() {
                             {userApplication && userApplication.assignedManager && (
                               <div className={`text-xs ${textColor} bg-white bg-opacity-20 rounded-lg p-2 text-center`}>
                                 <span className="font-semibold">Waiting with: {userApplication.assignedManager.name}</span>
+                              </div>
+                            )}
+                            {userApplication && userApplication.cancellationRequestedReason && (
+                              <div className={`text-xs ${textColor} bg-white bg-opacity-20 rounded-lg p-2`}>
+                                <div className="font-semibold mb-1">Cancellation Request:</div>
+                                <div className="mb-1"><strong>Reason:</strong> {userApplication.cancellationRequestedReason}</div>
+                                {userApplication.cancellationRequestedAt && (
+                                  <div><strong>Requested:</strong> {new Date(userApplication.cancellationRequestedAt).toLocaleString()}</div>
+                                )}
                               </div>
                             )}
                           </div>

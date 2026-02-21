@@ -113,6 +113,9 @@ export async function GET(req: NextRequest) {
         id: userApplication.id,
         status: userApplication.status,
         assignedManager,
+        cancellationRequestedReason: userApplication.cancellationRequestedReason,
+        cancellationRequestedAt: userApplication.cancellationRequestedAt,
+        user: userApplication.user ? { name: userApplication.user.name } : undefined,
       } : undefined,
       // Keep applications as approved only for display
       applications: approvedApps,
