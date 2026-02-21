@@ -23,6 +23,31 @@ type Overtime = {
   };
 };
 
+function getTextColor(hexColor: string): string {
+  if (!hexColor || !/^#[0-9A-Fa-f]{6}$/.test(hexColor)) {
+    return "text-white";
+  }
+  
+  const luminance = parseInt(hexColor.slice(1, 3), 16) * 0.299 +
+                   parseInt(hexColor.slice(3, 5), 16) * 0.587 +
+                   parseInt(hexColor.slice(5, 7), 16) * 0.114;
+  return luminance < 128 ? "text-white" : "text-gray-900";
+}
+
+function lightenColor(hex: string, percent: number): string {
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    return hex;
+  }
+  
+  const num = parseInt(hex.replace("#", ""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+  const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
+  const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+  
+  return "#" + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
+}
+
 export default function OvertimeDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -182,53 +207,64 @@ export default function OvertimeDashboard() {
               No overtime records match your current filters.
             </div>
           ) : (
-            filteredOvertimes.map((ot) => (
-              <div
-                key={ot.id}
-                onClick={() => router.push(`/overtime/${ot.id}`)}
-                className="cursor-pointer bg-gray-800 rounded-lg p-4 border-l-4 hover:bg-gray-700 transition"
-                style={{
-                  borderColor: ot.areaShiftColour?.shiftColour.hexColor || ot.shiftColour?.hexColor || "#gray",
-                }}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="text-white font-bold text-lg">
-                    {new Date(ot.date).toLocaleDateString()}
-                  </div>
-                  {getStatusBadge(ot)}
-                </div>
-
-                <div className="text-gray-300 mb-2">
-                  {ot.areaShiftColour?.area.name || ot.area?.name} - {ot.areaShiftColour?.shiftColour.name || ot.shiftColour?.name}
-                </div>
-
-                <div className="text-gray-400 text-sm mb-2">
-                  {ot.startTime} - {ot.endTime}
-                </div>
-
-                <div className="text-gray-400 text-sm mb-2">
-                  Slots: {ot.approvedCount}/{ot.requiredPeople}
-                  {ot.approvedCount >= ot.requiredPeople && " (FULL)"}
-                </div>
-
-                {ot.acceptedWorkers && ot.acceptedWorkers.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-700">
-                    <div className="text-gray-400 text-xs mb-1">Booked:</div>
-                    <div className="text-white text-sm">
-                      {ot.acceptedWorkers.join(", ")}
+            filteredOvertimes.map((ot) => {
+              const bgColor = ot.areaShiftColour?.shiftColour.hexColor || ot.shiftColour?.hexColor || "#4B5563";
+              const lightBgColor = lightenColor(bgColor, 20);
+              const textColor = getTextColor(bgColor);
+              
+              return (
+                <div
+                  key={ot.id}
+                  onClick={() => router.push(`/overtime/${ot.id}`)}
+                  className="cursor-pointer rounded-2xl p-6 border-2 shadow-2xl transform transition-all duration-300 hover:scale-105"
+                  style={{
+                    background: `linear-gradient(135deg, ${bgColor} 0%, ${lightBgColor} 100%)`,
+                    borderColor: bgColor,
+                  }}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className={`font-bold text-lg ${textColor}`}>
+                      {new Date(ot.date).toLocaleDateString()}
                     </div>
+                    {getStatusBadge(ot)}
                   </div>
-                )}
 
-                {ot.userApplication?.assignedManager && (
-                  <div className="mt-2 pt-2 border-t border-gray-700">
-                    <div className="text-gray-400 text-xs">
-                      Waiting with: {ot.userApplication.assignedManager.name}
-                    </div>
+                  <div className={`mb-2 ${textColor} opacity-90`}>
+                    {ot.areaShiftColour?.area.name || ot.area?.name} - {ot.areaShiftColour?.shiftColour.name || ot.shiftColour?.name}
                   </div>
-                )}
-              </div>
-            ))
+
+                  <div className={`text-sm mb-2 ${textColor} opacity-80`}>
+                    {ot.startTime} - {ot.endTime}
+                  </div>
+
+                  <div className={`text-sm mb-2 ${textColor} opacity-90 font-semibold`}>
+                    Slots: {ot.approvedCount}/{ot.requiredPeople}
+                    {ot.approvedCount >= ot.requiredPeople && " (FULL)"}
+                  </div>
+
+                  {ot.acceptedWorkers && ot.acceptedWorkers.length > 0 && (
+                    <div className={`mt-2 pt-2 border-t ${textColor} opacity-30`}>
+                      <div className={`text-xs mb-1 ${textColor} opacity-90 font-semibold`}>Accepted:</div>
+                      <div className={`text-sm flex flex-wrap gap-1 ${textColor}`}>
+                        {ot.acceptedWorkers.map((worker, idx) => (
+                          <span key={idx} className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
+                            {worker}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {ot.userApplication?.assignedManager && (
+                    <div className={`mt-2 pt-2 border-t ${textColor} opacity-30`}>
+                      <div className={`text-xs ${textColor} opacity-90`}>
+                        Waiting with: {ot.userApplication.assignedManager.name}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>

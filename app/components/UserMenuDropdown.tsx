@@ -73,18 +73,6 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
       show: true,
     },
     {
-      label: "Shift Patterns",
-      icon: ClockIcon,
-      href: "/shift-patterns",
-      show: true,
-    },
-    {
-      label: "Shift Forecast",
-      icon: CalendarIcon,
-      href: "/shift-patterns/forecast",
-      show: true,
-    },
-    {
       label: "Inbox",
       icon: InboxIcon,
       href: "/inbox",
