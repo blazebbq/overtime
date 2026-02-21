@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/app/components/Header";
 import CancellationRequestModal from "@/app/components/CancellationRequestModal";
+import FilterDropdown from "@/app/components/FilterDropdown";
 
 type Overtime = {
   id: string;
@@ -296,55 +297,21 @@ export default function OvertimeDashboard() {
         <h1 className="text-3xl font-bold text-white mb-6">Overtime Dashboard</h1>
 
         {/* Filters */}
-        <div className="bg-gray-800 rounded-lg p-4 mb-6">
-          <div className="text-white font-medium mb-3">Filters:</div>
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 text-white cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showAvailable}
-                onChange={(e) => setShowAvailable(e.target.checked)}
-                className="w-4 h-4"
-              />
-              Show Available
-            </label>
-            <label className="flex items-center gap-2 text-white cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showMyApproved}
-                onChange={(e) => setShowMyApproved(e.target.checked)}
-                className="w-4 h-4"
-              />
-              Show My Approved
-            </label>
-            <label className="flex items-center gap-2 text-white cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showMyPending}
-                onChange={(e) => setShowMyPending(e.target.checked)}
-                className="w-4 h-4"
-              />
-              Show My Pending
-            </label>
-            <label className="flex items-center gap-2 text-white cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showCancellationPending}
-                onChange={(e) => setShowCancellationPending(e.target.checked)}
-                className="w-4 h-4"
-              />
-              Show Cancellation Pending
-            </label>
-            <label className="flex items-center gap-2 text-white cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={(e) => setShowArchived(e.target.checked)}
-                className="w-4 h-4"
-              />
-              Show Archived
-            </label>
-          </div>
+        <div className="mb-6">
+          <FilterDropdown
+            showAvailable={showAvailable}
+            showMyApproved={showMyApproved}
+            showMyPending={showMyPending}
+            showCancellationPending={showCancellationPending}
+            showArchived={showArchived}
+            onFilterChange={(filters) => {
+              setShowAvailable(filters.showAvailable);
+              setShowMyApproved(filters.showMyApproved);
+              setShowMyPending(filters.showMyPending);
+              setShowCancellationPending(filters.showCancellationPending);
+              setShowArchived(filters.showArchived);
+            }}
+          />
         </div>
 
         {/* Overtime Cards */}
