@@ -10,6 +10,7 @@ import {
   ClockIcon,
   ArchiveBoxIcon,
   XCircleIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/solid";
 
 type User = {
@@ -63,6 +64,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showCreateOvertime, setShowCreateOvertime] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showAreaAssignment, setShowAreaAssignment] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   // Check admin access
   useEffect(() => {
@@ -352,6 +355,17 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedUserId(user.id);
+                          setShowAreaAssignment(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors"
+                        title="Assign Areas"
+                      >
+                        <MapPinIcon className="w-4 h-4" />
+                        Assign Areas
+                      </button>
                       <select
                         value={user.role}
                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -376,6 +390,17 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* Area Assignment Modal */}
+        {showAreaAssignment && selectedUserId && (
+          <AreaAssignmentModal
+            userId={selectedUserId}
+            onClose={() => {
+              setShowAreaAssignment(false);
+              setSelectedUserId(null);
+            }}
+          />
         )}
       </main>
     </>
@@ -786,6 +811,149 @@ function CreateUserForm({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// Area Assignment Modal Component
+function AreaAssignmentModal({
+  userId,
+  onClose,
+}: {
+  userId: string;
+  onClose: () => void;
+}) {
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // Fetch all areas
+        const areasRes = await fetch("/api/admin/areas");
+        if (!areasRes.ok) {
+          setError("Failed to load areas");
+          return;
+        }
+        const areasData = await areasRes.json();
+        setAreas(areasData.filter((a: Area) => a.enabled));
+
+        // Fetch user's current area assignments
+        const userAreasRes = await fetch(`/api/admin/users/${userId}/areas`);
+        if (userAreasRes.ok) {
+          const userAreasData = await userAreasRes.json();
+          setSelectedAreaIds(userAreasData.areaIds || []);
+        }
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setError("An error occurred while loading data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [userId]);
+
+  const handleToggleArea = (areaId: string) => {
+    setSelectedAreaIds((prev) => {
+      if (prev.includes(areaId)) {
+        return prev.filter((id) => id !== areaId);
+      } else {
+        return [...prev, areaId];
+      }
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/areas`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ areaIds: selectedAreaIds }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Failed to update area assignments");
+        return;
+      }
+
+      onClose();
+    } catch (err) {
+      console.error("Failed to save area assignments:", err);
+      setError("An error occurred while saving");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+        <h3 className="text-xl font-bold text-white mb-4">
+          Assign Areas to User
+        </h3>
+
+        {loading ? (
+          <div className="text-center text-zinc-400 py-8">Loading areas...</div>
+        ) : (
+          <>
+            <div className="space-y-2 mb-4">
+              {areas.length === 0 ? (
+                <div className="text-sm text-zinc-400 py-4">
+                  No areas available
+                </div>
+              ) : (
+                areas.map((area) => (
+                  <label
+                    key={area.id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800 hover:bg-zinc-750 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedAreaIds.includes(area.id)}
+                      onChange={() => handleToggleArea(area.id)}
+                      className="w-5 h-5 rounded border-zinc-600 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-white font-medium">{area.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+
+            {error && (
+              <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-sm mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 py-2 px-4 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-400 transition-colors"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={onClose}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
