@@ -2,12 +2,14 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowRightOnRectangleIcon, UserCircleIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
+import { ArrowRightOnRectangleIcon, UserCircleIcon, Cog6ToothIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/solid";
 import UserMenuDropdown from "./UserMenuDropdown";
+import { useState } from "react";
 
 export default function Header() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (status === "loading") {
     return (
@@ -52,7 +54,8 @@ export default function Header() {
           Overtime
         </h1>
 
-        <div className="flex items-center gap-4">
+        {/* Desktop Menu */}
+        <div className="hidden md:flex items-center gap-4">
           <div className="flex items-center gap-2 text-white">
             <UserCircleIcon className="w-6 h-6 text-zinc-400" />
             <div className="text-right">
@@ -97,7 +100,73 @@ export default function Header() {
             <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white transition-colors"
+          title="Menu"
+        >
+          {mobileMenuOpen ? (
+            <XMarkIcon className="w-6 h-6" />
+          ) : (
+            <Bars3Icon className="w-6 h-6" />
+          )}
+        </button>
       </div>
+
+      {/* Mobile Menu Dropdown */}
+      {mobileMenuOpen && (
+        <div className="md:hidden mt-4 border-t border-zinc-800 pt-4 space-y-3">
+          <div className="flex items-center gap-2 text-white pb-3 border-b border-zinc-800">
+            <UserCircleIcon className="w-6 h-6 text-zinc-400" />
+            <div className="flex-1">
+              <div className="text-sm font-semibold">{user?.name}</div>
+              <div className="text-xs text-zinc-400">{user?.email}</div>
+            </div>
+            {isSuperAdmin && (
+              <span className="px-2 py-1 text-xs font-semibold bg-red-600 text-white rounded">
+                SUPER ADMIN
+              </span>
+            )}
+            {isAdmin && !isSuperAdmin && (
+              <span className="px-2 py-1 text-xs font-semibold bg-purple-600 text-white rounded">
+                ADMIN
+              </span>
+            )}
+            {isManager && !isAdmin && (
+              <span className="px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded">
+                MANAGER
+              </span>
+            )}
+          </div>
+
+          {/* Mobile User Menu Dropdown */}
+          <UserMenuDropdown userRole={userRole} />
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              router.push("/settings");
+            }}
+            className="w-full flex items-center gap-2 px-4 py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold transition-colors text-sm"
+          >
+            <Cog6ToothIcon className="w-5 h-5" />
+            <span>Settings</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              signOut({ callbackUrl: "/login" });
+            }}
+            className="w-full flex items-center gap-2 px-4 py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold transition-colors"
+          >
+            <ArrowRightOnRectangleIcon className="w-5 h-5" />
+            <span>Logout</span>
+          </button>
+        </div>
+      )}
     </header>
   );
 }
