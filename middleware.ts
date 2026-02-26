@@ -8,7 +8,7 @@ const publicRoutes = ["/login", "/api/auth"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes
+  // Allow public routes and all NextAuth routes
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
   }
@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
   });
 
   // If not authenticated and trying to access a protected route, redirect to login
-  if (!token && !pathname.startsWith("/login")) {
+  if (!token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
@@ -38,7 +38,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public files (public folder)
+     * - api/auth routes (NextAuth)
+     * - login page
      */
-    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public|api/auth|login).*)",
   ],
 };
