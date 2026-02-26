@@ -14,13 +14,22 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check if user is authenticated
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
+  try {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+    });
 
-  // If not authenticated and trying to access a protected route, redirect to login
-  if (!token) {
+    // If not authenticated and trying to access a protected route, redirect to login
+    if (!token) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  } catch (error) {
+    console.error("Middleware token check error:", error);
+    // On error, redirect to login for safety
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
