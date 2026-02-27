@@ -452,15 +452,6 @@ export async function POST(req: Request) {
         application.overtimeId,
         `Your overtime application has been rejected for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}). Reason: ${rejectionReason}`
       );
-        "REJECTED_MANUAL",
-        {
-          date: new Date(application.overtime.date).toDateString(),
-          area: application.overtime.area.name,
-          shiftColour: application.overtime.shiftColour.name,
-          shiftHexColor: application.overtime.shiftColour.hexColor,
-          rejectionReason,
-        }
-      );
 
       // Resolve inbox items for this application
       await resolveInboxItems(applicationId, user!.id);
