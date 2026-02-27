@@ -358,7 +358,8 @@ export async function sendApplicationStatusEmail(
   userEmails: { primary: string; secondary?: string | null },
   userName: string,
   status: ApplicationStatus,
-  details: OvertimeDetails
+  details: OvertimeDetails,
+  applicationId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = getTransporter();
@@ -419,10 +420,12 @@ export async function sendApplicationStatusEmail(
       html,
     });
 
+    console.log(`[Email] Email sent: ${status} to ${recipients.join(", ")}${applicationId ? ` for application ${applicationId}` : ""}`);
     console.log("[Email] Sent application status email:", {
       messageId: info.messageId,
       recipients,
       status,
+      applicationId,
     });
 
     return { success: true };
@@ -433,6 +436,7 @@ export async function sendApplicationStatusEmail(
       error: errorMsg,
       status,
       userEmails,
+      applicationId,
     });
 
     return {

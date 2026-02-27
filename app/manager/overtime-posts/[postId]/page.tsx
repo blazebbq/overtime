@@ -211,6 +211,8 @@ export default function OvertimePostApplicationsPage({
   const pendingApplications = post.applications.filter(app => app.status === "PENDING_APPROVAL");
   const approvedApplications = post.applications.filter(app => app.status === "APPROVED");
   const rejectedApplications = post.applications.filter(app => app.status.startsWith("REJECTED"));
+  const cancelPendingApplications = post.applications.filter(app => app.status === "CANCEL_PENDING");
+  const cancelledApplications = post.applications.filter(app => app.status === "CANCELLED" || app.status === "WITHDRAWN");
 
   return (
     <>
@@ -394,6 +396,60 @@ export default function OvertimePostApplicationsPage({
                     </div>
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-600 text-white">
                       ✗ REJECTED
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cancellation Pending Applications */}
+        {cancelPendingApplications.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Cancellation Pending ({cancelPendingApplications.length})
+            </h2>
+            <div className="space-y-3">
+              {cancelPendingApplications.map((app) => (
+                <div
+                  key={app.id}
+                  className="p-4 rounded-lg bg-orange-900/20 border border-orange-500/50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-white">{app.user.name}</div>
+                      <div className="text-sm text-zinc-400">{app.user.email}</div>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-600 text-white">
+                      ⚠️ CANCEL PENDING
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cancelled/Withdrawn Applications */}
+        {cancelledApplications.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Cancelled/Withdrawn ({cancelledApplications.length})
+            </h2>
+            <div className="space-y-3">
+              {cancelledApplications.map((app) => (
+                <div
+                  key={app.id}
+                  className="p-4 rounded-lg bg-gray-900/20 border border-gray-500/50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-white">{app.user.name}</div>
+                      <div className="text-sm text-zinc-400">{app.user.email}</div>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-600 text-white">
+                      {app.status === "WITHDRAWN" ? "↩️ WITHDRAWN" : "✗ CANCELLED"}
                     </span>
                   </div>
                 </div>
