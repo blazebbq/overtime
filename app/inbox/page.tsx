@@ -147,6 +147,68 @@ export default function InboxPage() {
     }
   };
 
+  const handleApproveApplication = async (
+    e: React.MouseEvent,
+    applicationId: string
+  ) => {
+    e.stopPropagation(); // Prevent card click
+    if (!confirm("Approve this overtime application?")) return;
+
+    try {
+      const response = await fetch("/api/manager/application-approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "APPROVE",
+        }),
+      });
+
+      if (response.ok) {
+        alert("Application approved successfully");
+        loadInboxItems();
+      } else {
+        const data = await response.json();
+        alert(`Failed to approve: ${data.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to approve application:", error);
+      alert("Failed to approve application");
+    }
+  };
+
+  const handleRejectApplication = async (
+    e: React.MouseEvent,
+    applicationId: string
+  ) => {
+    e.stopPropagation(); // Prevent card click
+    const reason = prompt("Please provide a reason for rejection:");
+    if (!reason) return;
+
+    try {
+      const response = await fetch("/api/manager/application-approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "REJECT",
+          rejectionReason: reason,
+        }),
+      });
+
+      if (response.ok) {
+        alert("Application rejected successfully");
+        loadInboxItems();
+      } else {
+        const data = await response.json();
+        alert(`Failed to reject: ${data.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to reject application:", error);
+      alert("Failed to reject application");
+    }
+  };
+
   const getTypeLabel = (type: InboxItemType) => {
     return type === "APPLICATION_REQUEST"
       ? "New Application"
@@ -335,6 +397,22 @@ export default function InboxPage() {
                   </div>
 
                   <div className="ml-4 flex flex-col gap-2">
+                    {item.type === "APPLICATION_REQUEST" && item.status !== "RESOLVED" && (
+                      <>
+                        <button
+                          onClick={(e) => handleApproveApplication(e, item.applicationId)}
+                          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
+                        >
+                          Approve Application
+                        </button>
+                        <button
+                          onClick={(e) => handleRejectApplication(e, item.applicationId)}
+                          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium"
+                        >
+                          Reject Application
+                        </button>
+                      </>
+                    )}
                     {item.type === "CANCELLATION_REQUEST" && item.status !== "RESOLVED" && (
                       <>
                         <button

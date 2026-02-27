@@ -388,6 +388,7 @@ export async function POST(req: Request) {
           approvedStartTime,
           approvedEndTime,
         }
+      );
 
       // Create user notification
       await createUserNotification(
@@ -396,7 +397,6 @@ export async function POST(req: Request) {
         applicationId,
         application.overtimeId,
         `Your overtime application has been approved for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}). Time: ${approvedStartTime} - ${approvedEndTime}`
-      );
       );
 
       // Resolve inbox items for this application
