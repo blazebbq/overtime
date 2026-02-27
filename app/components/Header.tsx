@@ -24,6 +24,44 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Get user role early for hook dependencies
+  const user = session?.user;
+  const userRole = (user as { role?: string })?.role || "USER";
+  const isSuperAdmin = userRole === "SUPER_ADMIN";
+  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const isManager = userRole === "MANAGER" || isAdmin;
+
+  // Fetch unread count for managers/admins - MUST be declared before any returns
+  useEffect(() => {
+    // Only fetch if user is a manager/admin
+    if (!isManager) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch("/api/inbox?status=UNREAD");
+        if (response.ok) {
+          const data = await response.json();
+          setUnreadCount(data.length);
+        }
+      } catch (error) {
+        console.error("Failed to fetch unread count:", error);
+      }
+    };
+
+    fetchUnreadCount();
+    
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    
+    return () => clearInterval(interval);
+  }, [isManager]);
+
+  // Handle logout with absolute URL to prevent localhost redirect
+  const handleLogout = () => {
+    const callbackUrl = `${window.location.origin}/login`;
+    signOut({ callbackUrl });
+  };
+
   if (status === "loading") {
     return (
       <header className="bg-zinc-900 border-b border-zinc-800 p-4">
@@ -50,34 +88,6 @@ export default function Header() {
       </header>
     );
   }
-
-  const user = session.user;
-  const userRole = (user as { role?: string }).role || "USER";
-  const isSuperAdmin = userRole === "SUPER_ADMIN";
-  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
-  const isManager = userRole === "MANAGER" || isAdmin;
-
-  // Fetch unread count for managers/admins
-  useEffect(() => {
-    if (isManager) {
-      fetchUnreadCount();
-      // Refresh count every 30 seconds
-      const interval = setInterval(fetchUnreadCount, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [isManager]);
-
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await fetch("/api/inbox?status=UNREAD");
-      if (response.ok) {
-        const data = await response.json();
-        setUnreadCount(data.length);
-      }
-    } catch (error) {
-      console.error("Failed to fetch unread count:", error);
-    }
-  };
 
   // Define menu items
   const menuItems = [
@@ -181,7 +191,7 @@ export default function Header() {
           </button>
 
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold transition-colors"
             title="Logout"
           >
@@ -291,7 +301,7 @@ export default function Header() {
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  signOut({ callbackUrl: "/login" });
+                  handleLogout();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
               >
