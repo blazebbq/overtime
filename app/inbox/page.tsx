@@ -4,16 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 
-type InboxItemType = "APPLICATION_REQUEST" | "CANCELLATION_REQUEST";
+type InboxItemType = "APPLICATION_REQUEST" | "CANCELLATION_REQUEST" | "USER_NOTIFICATION";
 type InboxItemStatus = "UNREAD" | "OPEN" | "RESOLVED";
+type NotificationType = "APPROVED" | "REJECTED" | "CANCELLED" | "AUTO_REJECTED";
 
 interface InboxItem {
   id: string;
   type: InboxItemType;
+  notificationType?: NotificationType; // Only for USER_NOTIFICATION type
   status: InboxItemStatus;
   createdAt: string;
   resolvedAt: string | null;
   cancellationRequestedReason: string | null;
+  message?: string; // Only for USER_NOTIFICATION type
   requester: {
     id: string;
     name: string | null;
@@ -229,10 +232,21 @@ export default function InboxPage() {
     }
   };
 
-  const getTypeLabel = (type: InboxItemType) => {
-    return type === "APPLICATION_REQUEST"
-      ? "New Application"
-      : "Cancellation Request";
+  const getTypeLabel = (item: InboxItem) => {
+    if (item.type === "APPLICATION_REQUEST") {
+      return "New Application";
+    } else if (item.type === "CANCELLATION_REQUEST") {
+      return "Cancellation Request";
+    } else if (item.type === "USER_NOTIFICATION") {
+      const labels = {
+        APPROVED: "Application Approved",
+        REJECTED: "Application Rejected",
+        CANCELLED: "Overtime Cancelled",
+        AUTO_REJECTED: "Application Auto-Rejected",
+      };
+      return labels[item.notificationType!] || "Notification";
+    }
+    return "Unknown";
   };
 
   const getStatusBadge = (status: InboxItemStatus) => {
@@ -250,18 +264,33 @@ export default function InboxPage() {
     );
   };
 
-  const getTypeBadge = (type: InboxItemType) => {
-    const styles = {
-      APPLICATION_REQUEST: "bg-purple-500 text-white",
-      CANCELLATION_REQUEST: "bg-orange-500 text-white",
-    };
-    return (
-      <span
-        className={`px-2 py-1 rounded text-xs font-semibold ${styles[type]}`}
-      >
-        {getTypeLabel(type)}
-      </span>
-    );
+  const getTypeBadge = (item: InboxItem) => {
+    if (item.type === "APPLICATION_REQUEST") {
+      return (
+        <span className="px-2 py-1 rounded text-xs font-semibold bg-purple-500 text-white">
+          {getTypeLabel(item)}
+        </span>
+      );
+    } else if (item.type === "CANCELLATION_REQUEST") {
+      return (
+        <span className="px-2 py-1 rounded text-xs font-semibold bg-orange-500 text-white">
+          {getTypeLabel(item)}
+        </span>
+      );
+    } else if (item.type === "USER_NOTIFICATION") {
+      const styles = {
+        APPROVED: "bg-green-500 text-white",
+        REJECTED: "bg-red-500 text-white",
+        CANCELLED: "bg-gray-500 text-white",
+        AUTO_REJECTED: "bg-orange-500 text-white",
+      };
+      const style = styles[item.notificationType!] || "bg-blue-500 text-white";
+      return (
+        <span className={`px-2 py-1 rounded text-xs font-semibold ${style}`}>
+          {getTypeLabel(item)}
+        </span>
+      );
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -365,7 +394,7 @@ export default function InboxPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      {getTypeBadge(item.type)}
+                      {getTypeBadge(item)}
                       {getStatusBadge(item.status)}
                     </div>
 
@@ -408,6 +437,12 @@ export default function InboxPage() {
                       </div>
                     )}
 
+                    {item.type === "USER_NOTIFICATION" && item.message && (
+                      <div className="text-sm text-gray-700 mb-2 bg-blue-50 border-l-4 border-blue-400 p-2">
+                        <span>{item.message}</span>
+                      </div>
+                    )}
+
                     <div className="text-xs text-gray-500">
                       Requested: {formatDateTime(item.createdAt)}
                       {item.resolvedAt && (
@@ -417,6 +452,7 @@ export default function InboxPage() {
                   </div>
 
                   <div className="ml-4 flex flex-col gap-2">
+                    {/* Only show action buttons for APPLICATION_REQUEST and CANCELLATION_REQUEST */}
                     {item.type === "APPLICATION_REQUEST" && item.status !== "RESOLVED" && (
                       <>
                         <button

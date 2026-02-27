@@ -109,6 +109,8 @@ export async function GET(req: NextRequest) {
         date: item.post.date.toISOString(),
         startTime: item.post.startTime,
         endTime: item.post.endTime,
+        approvedCount: item.post.approvedCount,
+        requiredPeople: item.post.requiredPeople,
         area: {
           name: item.post.area.name,
           colour: item.post.shiftColour.hexColor,
@@ -121,7 +123,76 @@ export async function GET(req: NextRequest) {
       applicationId: item.application.id,
     }));
 
-    return NextResponse.json(transformed);
+    // For managers/admins/superadmins, also include their personal user notifications
+    let userNotifications: any[] = [];
+    if (user!.role === "MANAGER" || user!.role === "ADMIN" || user!.role === "SUPER_ADMIN") {
+      // Build notification where clause based on status filter
+      let notificationWhereClause: any = {
+        userId: user!.id,
+      };
+      
+      if (statusFilter) {
+        // Map inbox status to notification status
+        if (statusFilter === "UNREAD") {
+          notificationWhereClause.status = "UNREAD";
+        } else if (statusFilter === "OPEN" || statusFilter === "RESOLVED") {
+          notificationWhereClause.status = "READ";
+        }
+      }
+
+      const notifications = await prisma.userNotification.findMany({
+        where: notificationWhereClause,
+        include: {
+          post: {
+            include: {
+              area: true,
+              shiftColour: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      userNotifications = notifications.map((notification) => ({
+        id: notification.id,
+        type: "USER_NOTIFICATION",
+        notificationType: notification.type,
+        status: notification.status === "UNREAD" ? "UNREAD" : "OPEN",
+        createdAt: notification.createdAt.toISOString(),
+        resolvedAt: notification.readAt?.toISOString() || null,
+        cancellationRequestedReason: null,
+        message: notification.message,
+        requester: {
+          id: user!.id,
+          name: user!.name,
+          email: user!.email,
+        },
+        overtimePost: {
+          id: notification.post.id,
+          date: notification.post.date.toISOString(),
+          startTime: notification.post.startTime,
+          endTime: notification.post.endTime,
+          approvedCount: notification.post.approvedCount,
+          requiredPeople: notification.post.requiredPeople,
+          area: {
+            name: notification.post.area.name,
+            colour: notification.post.shiftColour.hexColor,
+          },
+          shiftColour: {
+            name: notification.post.shiftColour.name,
+            colour: notification.post.shiftColour.hexColor,
+          },
+        },
+        applicationId: notification.applicationId,
+      }));
+    }
+
+    // Combine inbox items and user notifications, sort by createdAt
+    const combined = [...transformed, ...userNotifications].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return NextResponse.json(combined);
   } catch (err) {
     console.error("Error fetching inbox items:", err);
     return NextResponse.json(
