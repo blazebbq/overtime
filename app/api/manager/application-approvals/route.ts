@@ -443,6 +443,15 @@ export async function POST(req: Request) {
           secondary: application.user.secondaryEmail,
         },
         application.user.name,
+        "REJECTED_MANUAL",
+        {
+          date: new Date(application.overtime.date).toDateString(),
+          area: application.overtime.area.name,
+          shiftColour: application.overtime.shiftColour.name,
+          shiftHexColor: application.overtime.shiftColour.hexColor,
+          rejectionReason,
+        }
+      );
 
       // Create user notification
       await createUserNotification(

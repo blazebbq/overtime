@@ -367,6 +367,22 @@ export default function OvertimeDashboard() {
                     {ot.approvedCount >= ot.requiredPeople && " (FULL)"}
                   </div>
 
+                  {/* Visual Slot Blocks */}
+                  <div className="mb-3 flex gap-2">
+                    {Array.from({ length: ot.requiredPeople }).map((_, index) => (
+                      <div
+                        key={index}
+                        className={`flex-1 min-w-[80px] px-2 py-2 rounded border-2 ${textColor} text-xs text-center font-semibold ${
+                          index < ot.acceptedWorkers.length
+                            ? 'bg-white bg-opacity-30 border-white border-opacity-50'
+                            : 'bg-transparent border-white border-opacity-30 border-dashed'
+                        }`}
+                      >
+                        {index < ot.acceptedWorkers.length ? ot.acceptedWorkers[index].name : 'Empty'}
+                      </div>
+                    ))}
+                  </div>
+
                   {/* Accepted Users */}
                   <div className={`mb-3 ${textColor}`}>
                     <div className={`text-sm mb-1 ${textColor} opacity-90 font-semibold`}>Accepted:</div>
