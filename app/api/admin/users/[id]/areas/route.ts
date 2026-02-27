@@ -5,13 +5,20 @@ import { prisma } from "@/lib/prisma";
 // GET /api/admin/users/[id]/areas - Get areas assigned to a user
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { user, error } = await requireAdmin();
   if (error) return error;
 
   try {
-    const userId = params.id;
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      );
+    }
+    const userId = id;
 
     // Get all manager assignments for this user (where they are the managed user)
     const assignments = await prisma.managerAssignment.findMany({
@@ -47,13 +54,20 @@ export async function GET(
 // PUT /api/admin/users/[id]/areas - Set areas for a user
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { user, error } = await requireAdmin();
   if (error) return error;
 
   try {
-    const userId = params.id;
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      );
+    }
+    const userId = id;
     const body = await req.json();
     const { areaIds } = body;
 

@@ -372,31 +372,15 @@ export default function OvertimeDashboard() {
                     {Array.from({ length: ot.requiredPeople }).map((_, index) => (
                       <div
                         key={index}
-                        className={`flex-1 min-w-[80px] px-2 py-2 rounded border-2 ${textColor} text-xs text-center font-semibold ${
+                        className={`flex-1 min-w-[80px] px-2 py-2 rounded border-2 text-xs text-center font-semibold ${
                           index < ot.acceptedWorkers.length
-                            ? 'bg-white bg-opacity-30 border-white border-opacity-50'
-                            : 'bg-transparent border-white border-opacity-30 border-dashed'
+                            ? 'bg-green-500 text-black border-green-600'
+                            : 'bg-red-500 text-white border-red-600'
                         }`}
                       >
                         {index < ot.acceptedWorkers.length ? ot.acceptedWorkers[index].name : 'Empty'}
                       </div>
                     ))}
-                  </div>
-
-                  {/* Accepted Users */}
-                  <div className={`mb-3 ${textColor}`}>
-                    <div className={`text-sm mb-1 ${textColor} opacity-90 font-semibold`}>Accepted:</div>
-                    {ot.acceptedWorkers && ot.acceptedWorkers.length > 0 ? (
-                      <div className={`text-sm flex flex-wrap gap-1 ${textColor}`}>
-                        {ot.acceptedWorkers.map((worker, idx) => (
-                          <span key={idx} className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
-                            {worker.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className={`text-sm ${textColor} opacity-75 italic`}>None yet</div>
-                    )}
                   </div>
 
                   {ot.userApplication?.assignedManager && (
@@ -498,32 +482,8 @@ export default function OvertimeDashboard() {
                             )}
                           </div>
                         );
-                      } else if (applicationStatus === "CANCELLED") {
-                        return (
-                          <div className="space-y-2">
-                            <div className="w-full py-2 px-3 rounded-lg bg-gray-500 text-white font-semibold text-center text-sm">
-                              ✗ Cancelled
-                            </div>
-                            {!isFull && (
-                              <div className="space-y-2">
-                                <button
-                                  onClick={() => openApplicationModal(ot.id, "FULL")}
-                                  className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors text-sm"
-                                >
-                                  Apply Again (Full Shift)
-                                </button>
-                                <button
-                                  onClick={() => openApplicationModal(ot.id, "PARTIAL")}
-                                  className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors text-sm"
-                                >
-                                  Apply Again (Different Hours)
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      } else if (applicationStatus === "WITHDRAWN") {
-                        // WITHDRAWN applications should show normal apply buttons (not "Apply Again")
+                      } else if (applicationStatus === "CANCELLED" || applicationStatus === "WITHDRAWN") {
+                        // CANCELLED and WITHDRAWN should show normal apply buttons (not "Apply Again")
                         return !isFull ? (
                           <div className="space-y-2">
                             <button
