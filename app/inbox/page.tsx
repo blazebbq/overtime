@@ -24,6 +24,8 @@ interface InboxItem {
     date: string;
     startTime: string;
     endTime: string;
+    approvedCount?: number;
+    requiredPeople?: number;
     area: {
       name: string;
       colour: string;
@@ -149,10 +151,26 @@ export default function InboxPage() {
 
   const handleApproveApplication = async (
     e: React.MouseEvent,
-    applicationId: string
+    applicationId: string,
+    overtimePost: InboxItem["overtimePost"]
   ) => {
     e.stopPropagation(); // Prevent card click
-    if (!confirm("Approve this overtime application?")) return;
+    
+    // Check if approving would exceed required slots (matching Manager Approvals logic)
+    if (overtimePost.approvedCount !== undefined && overtimePost.requiredPeople !== undefined) {
+      if (overtimePost.approvedCount >= overtimePost.requiredPeople) {
+        const confirmed = window.confirm(
+          `This will exceed required slots (${overtimePost.approvedCount + 1}/${overtimePost.requiredPeople}).\n\n` +
+          `Do you want to approve anyway?`
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+    } else {
+      // Regular confirmation if slot info not available
+      if (!confirm("Approve this overtime application?")) return;
+    }
 
     try {
       const response = await fetch("/api/manager/application-approvals", {
@@ -161,6 +179,8 @@ export default function InboxPage() {
         body: JSON.stringify({
           applicationId,
           action: "APPROVE",
+          approvedStartTime: overtimePost.startTime,
+          approvedEndTime: overtimePost.endTime,
         }),
       });
 
@@ -400,7 +420,7 @@ export default function InboxPage() {
                     {item.type === "APPLICATION_REQUEST" && item.status !== "RESOLVED" && (
                       <>
                         <button
-                          onClick={(e) => handleApproveApplication(e, item.applicationId)}
+                          onClick={(e) => handleApproveApplication(e, item.applicationId, item.overtimePost)}
                           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
                         >
                           Approve Application

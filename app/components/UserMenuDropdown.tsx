@@ -80,6 +80,12 @@ export default function UserMenuDropdown({ userRole }: UserMenuDropdownProps) {
       badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
+      label: "User Inbox",
+      icon: InboxIcon,
+      href: "/user-inbox",
+      show: true, // Visible to all users
+    },
+    {
       label: "Manager Approvals",
       icon: UserGroupIcon,
       href: "/manager/overtime-posts",
