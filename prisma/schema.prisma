@@ -143,6 +143,7 @@ model OvertimeRequest {
   applications       OvertimeApplication[]
   approvals          OvertimeApproval[]
   inboxItems         InboxItem[]
+  userNotifications UserNotification[]
 }
 
 model Booking {
@@ -191,6 +192,7 @@ model OvertimeApplication {
   overtime           OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
   inboxItems         InboxItem[]
   paySegments        OvertimePaySegment[]
+  userNotifications UserNotification[]
   
   // Removed unique constraint to allow reapplication after rejection/cancellation
   @@index([userId, overtimeId])
@@ -269,6 +271,26 @@ model InboxItem {
   application      OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   
   @@index([assignedToUserId, status])
+  @@index([postId])
+  @@index([applicationId])
+}
+
+model UserNotification {
+  id           String   @id @default(cuid())
+  userId       String   // User receiving the notification
+  type         String   // APPROVED | REJECTED | CANCELLED | AUTO_REJECTED
+  message      String   // Human-readable message
+  postId       String   // OvertimeRequest ID
+  applicationId String  // OvertimeApplication ID
+  status       String   @default("UNREAD") // UNREAD | READ
+  createdAt    DateTime @default(now())
+  readAt       DateTime?
+  
+  // Relations
+  post         OvertimeRequest     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  application  OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, status])
   @@index([postId])
   @@index([applicationId])
 }

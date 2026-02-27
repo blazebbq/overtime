@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendApplicationStatusEmail } from "@/lib/email";
 import { resolveInboxItems } from "@/lib/inbox";
 import { calculatePaySegments, parseDateTime } from "@/lib/payCalculation";
+import { createUserNotification } from "@/lib/userNotifications";
 
 // GET - List applications needing approval
 export async function GET(req: NextRequest) {
@@ -323,6 +324,15 @@ export async function POST(req: Request) {
                 shiftHexColor: application.overtime.shiftColour.hexColor,
               }
             );
+
+            // Create user notification for auto-rejection
+            await createUserNotification(
+              pendingApp.userId,
+              "AUTO_REJECTED",
+              pendingApp.id,
+              application.overtimeId,
+              `Your overtime application has been auto-rejected for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}) because capacity was reached.`
+            );
           }
 
           // Create audit logs for auto-rejections
@@ -378,6 +388,15 @@ export async function POST(req: Request) {
           approvedStartTime,
           approvedEndTime,
         }
+
+      // Create user notification
+      await createUserNotification(
+        application.userId,
+        "APPROVED",
+        applicationId,
+        application.overtimeId,
+        `Your overtime application has been approved for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}). Time: ${approvedStartTime} - ${approvedEndTime}`
+      );
       );
 
       // Resolve inbox items for this application
@@ -424,6 +443,15 @@ export async function POST(req: Request) {
           secondary: application.user.secondaryEmail,
         },
         application.user.name,
+
+      // Create user notification
+      await createUserNotification(
+        application.userId,
+        "REJECTED",
+        applicationId,
+        application.overtimeId,
+        `Your overtime application has been rejected for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}). Reason: ${rejectionReason}`
+      );
         "REJECTED_MANUAL",
         {
           date: new Date(application.overtime.date).toDateString(),

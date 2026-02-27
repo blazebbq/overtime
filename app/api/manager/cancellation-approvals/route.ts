@@ -3,6 +3,7 @@ import { requireManager } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { sendApplicationStatusEmail } from "@/lib/email";
 import { resolveInboxItems } from "@/lib/inbox";
+import { createUserNotification } from "@/lib/userNotifications";
 
 // GET - List cancellation requests needing approval
 export async function GET(req: NextRequest) {
@@ -304,6 +305,15 @@ export async function POST(req: Request) {
           shiftColour: application.overtime.shiftColour.name,
           shiftHexColor: application.overtime.shiftColour.hexColor,
         }
+
+      // Create user notification
+      await createUserNotification(
+        application.userId,
+        "CANCELLED",
+        applicationId,
+        application.overtimeId,
+        `Your overtime cancellation has been approved for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}).`
+      );
       );
 
       // Resolve inbox items for this cancellation request

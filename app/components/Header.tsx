@@ -105,6 +105,12 @@ export default function Header() {
       badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
+      label: "My Inbox",
+      icon: InboxIcon,
+      href: "/user-inbox",
+      show: !isManager, // Only for regular users, managers use the manager inbox
+    },
+    {
       label: "Manager Approvals",
       icon: UserGroupIcon,
       href: "/manager/overtime-posts",
