@@ -62,7 +62,7 @@ export default function OvertimeDashboard() {
   const [showAvailable, setShowAvailable] = useState(true);
   const [showMyApproved, setShowMyApproved] = useState(true);
   const [showMyPending, setShowMyPending] = useState(true);
-  const [showCancellationPending, setShowCancellationPending] = useState(false);
+  const [showCancellationPending, setShowCancellationPending] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
 
   // Application modal state
