@@ -305,6 +305,7 @@ export async function POST(req: Request) {
           shiftColour: application.overtime.shiftColour.name,
           shiftHexColor: application.overtime.shiftColour.hexColor,
         }
+      );
 
       // Create user notification
       await createUserNotification(
@@ -313,7 +314,6 @@ export async function POST(req: Request) {
         applicationId,
         application.overtimeId,
         `Your overtime cancellation has been approved for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}).`
-      );
       );
 
       // Resolve inbox items for this cancellation request
