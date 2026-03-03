@@ -110,7 +110,6 @@ export async function PUT(
 
       await prisma.managerAssignment.createMany({
         data: assignments,
-        skipDuplicates: true,
       });
     }
 
