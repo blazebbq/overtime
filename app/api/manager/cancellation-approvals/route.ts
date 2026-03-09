@@ -380,6 +380,15 @@ export async function POST(req: Request) {
         }
       );
 
+      // FIX 5: Create user notification when manager rejects cancellation
+      await createUserNotification(
+        application.userId,
+        "REJECTED",
+        applicationId,
+        application.overtimeId,
+        `Your cancellation request has been rejected for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}). Your overtime shift remains approved.`
+      );
+
       // Resolve inbox items for this cancellation request
       await resolveInboxItems(applicationId, user!.id);
 

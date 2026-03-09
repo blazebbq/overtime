@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { sendGenericEmail } from "@/lib/email";
 import { resolveInboxItems } from "@/lib/inbox";
+import { createUserNotification } from "@/lib/userNotifications";
 
 // POST - Admin/Manager cancels an approved application on behalf of user
 export async function POST(req: Request) {
@@ -154,6 +155,15 @@ export async function POST(req: Request) {
         console.error(`Failed to send cancellation email to ${email}:`, emailError);
       }
     }
+
+    // FIX 3: Create user notification when manager/admin cancels approved overtime
+    await createUserNotification(
+      application.userId,
+      "CANCELLED",
+      applicationId,
+      application.overtimeId,
+      `Your approved overtime shift has been cancelled by management for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}). Reason: ${reason}`
+    );
 
     // Resolve any inbox items related to this application
     await resolveInboxItems(applicationId, user.id);

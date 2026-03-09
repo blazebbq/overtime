@@ -110,7 +110,15 @@ export default function OvertimeDashboard() {
           const assignedRes = await fetch(`/api/admin/users/${session.user.id}/areas`);
           if (assignedRes.ok) {
             const assignedData = await assignedRes.json();
-            const assignedIds = assignedData.map((a: any) => a.areaId).filter(Boolean);
+            
+            // FIX 1: Handle both array and object formats
+            let assignedIds: string[] = [];
+            if (Array.isArray(assignedData)) {
+              assignedIds = assignedData.map((a: any) => a.areaId).filter(Boolean);
+            } else if (Array.isArray(assignedData?.areas)) {
+              assignedIds = assignedData.areas.map((a: any) => a.areaId).filter(Boolean);
+            }
+            
             setAssignedAreaIds(assignedIds);
             // Auto-enable assigned areas by default
             setSelectedAreaIds(assignedIds);
