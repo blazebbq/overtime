@@ -212,38 +212,55 @@ export async function POST(req: Request) {
 
     // Verify manager permission (skip for SUPER_ADMIN)
     if (user!.role !== "SUPER_ADMIN") {
-      // Check if manager is assigned to:
-      // 1. The user (direct report), OR
-      // 2. The area of the overtime
-      const managerAssignments = await prisma.managerAssignment.findMany({
-        where: {
-          managerId: user!.id,
-          OR: [
-            // Assigned to the user
-            { userId: application.userId },
-            // Assigned to the area
-            { areaId: application.overtime.areaId },
-          ],
-        },
-      });
-
-      if (managerAssignments.length === 0) {
-        return NextResponse.json(
-          { error: "You are not authorized to approve this cancellation. You must be assigned to either the user or the area." },
-          { status: 403 }
-        );
-      }
-
-      // If assigned by area, verify shift colour if specified
-      const areaAssignment = managerAssignments.find(
-        (ma) => ma.areaId === application.overtime.areaId
-      );
-      if (areaAssignment && areaAssignment.shiftColourId) {
-        if (areaAssignment.shiftColourId !== application.overtime.shiftColourId) {
+      if (user!.role === "ADMIN") {
+        // For ADMIN: Check if they have access to this overtime's area
+        const adminAreas = await prisma.managerAssignment.findMany({
+          where: { userId: user!.id },
+          select: { areaId: true }
+        });
+        const areaIds = adminAreas.map(a => a.areaId).filter(Boolean);
+        
+        if (!areaIds.includes(application.overtime.areaId)) {
           return NextResponse.json(
-            { error: "You are not assigned to manage this shift colour in this area" },
+            { error: "You do not have permission to manage cancellations for this area" },
             { status: 403 }
           );
+        }
+      } else {
+        // For MANAGER: Check manager assignment
+        // Check if manager is assigned to:
+        // 1. The user (direct report), OR
+        // 2. The area of the overtime
+        const managerAssignments = await prisma.managerAssignment.findMany({
+          where: {
+            managerId: user!.id,
+            OR: [
+              // Assigned to the user
+              { userId: application.userId },
+              // Assigned to the area
+              { areaId: application.overtime.areaId },
+            ],
+          },
+        });
+
+        if (managerAssignments.length === 0) {
+          return NextResponse.json(
+            { error: "You are not authorized to approve this cancellation. You must be assigned to either the user or the area." },
+            { status: 403 }
+          );
+        }
+
+        // If assigned by area, verify shift colour if specified
+        const areaAssignment = managerAssignments.find(
+          (ma) => ma.areaId === application.overtime.areaId
+        );
+        if (areaAssignment && areaAssignment.shiftColourId) {
+          if (areaAssignment.shiftColourId !== application.overtime.shiftColourId) {
+            return NextResponse.json(
+              { error: "You are not assigned to manage this shift colour in this area" },
+              { status: 403 }
+            );
+          }
         }
       }
     }

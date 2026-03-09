@@ -172,32 +172,49 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify manager is assigned to manage this user (skip for SUPER_ADMIN)
+    // Verify manager is assigned to manage this user or admin has area access (skip for SUPER_ADMIN)
     if (user!.role !== "SUPER_ADMIN") {
-      const managerAssignment = await prisma.managerAssignment.findFirst({
-        where: {
-          managerId: user!.id,
-          userId: application.userId,
-          OR: [{ areaId: null }, { areaId: application.overtime.areaId }],
-        },
-      });
+      if (user!.role === "ADMIN") {
+        // For ADMIN: Check if they have access to this overtime's area
+        const adminAreas = await prisma.managerAssignment.findMany({
+          where: { userId: user!.id },
+          select: { areaId: true }
+        });
+        const areaIds = adminAreas.map(a => a.areaId).filter(Boolean);
+        
+        if (!areaIds.includes(application.overtime.areaId)) {
+          return NextResponse.json(
+            { error: "You do not have permission to manage applications for this area" },
+            { status: 403 }
+          );
+        }
+      } else {
+        // For MANAGER: Check manager assignment
+        const managerAssignment = await prisma.managerAssignment.findFirst({
+          where: {
+            managerId: user!.id,
+            userId: application.userId,
+            OR: [{ areaId: null }, { areaId: application.overtime.areaId }],
+          },
+        });
 
-      if (!managerAssignment) {
-        return NextResponse.json(
-          { error: "You are not assigned to manage this user" },
-          { status: 403 }
-        );
-      }
+        if (!managerAssignment) {
+          return NextResponse.json(
+            { error: "You are not assigned to manage this user" },
+            { status: 403 }
+          );
+        }
 
-      // Additional check for shift colour
-      if (
-        managerAssignment.shiftColourId &&
-        managerAssignment.shiftColourId !== application.overtime.shiftColourId
-      ) {
-        return NextResponse.json(
-          { error: "You are not assigned to manage this shift colour" },
-          { status: 403 }
-        );
+        // Additional check for shift colour
+        if (
+          managerAssignment.shiftColourId &&
+          managerAssignment.shiftColourId !== application.overtime.shiftColourId
+        ) {
+          return NextResponse.json(
+            { error: "You are not assigned to manage this shift colour" },
+            { status: 403 }
+          );
+        }
       }
     }
 

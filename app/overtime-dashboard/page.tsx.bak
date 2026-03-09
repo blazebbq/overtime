@@ -65,11 +65,6 @@ export default function OvertimeDashboard() {
   const [showCancellationPending, setShowCancellationPending] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
 
-  // NEW: Area filter state
-  const [areas, setAreas] = useState<{ id: string; name: string }[]>([]);
-  const [assignedAreaIds, setAssignedAreaIds] = useState<string[]>([]);
-  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
-
   // Application modal state
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [selectedOvertime, setSelectedOvertime] = useState<Overtime | null>(null);
@@ -86,51 +81,13 @@ export default function OvertimeDashboard() {
   const [selectedCancellationOvertime, setSelectedCancellationOvertime] = useState<Overtime | null>(null);
 
   useEffect(() => {
-    loadAreasAndAssignments();
-  }, []);
-
-  useEffect(() => {
     loadOvertimes();
-  }, [showArchived, selectedAreaIds]);
-
-  const loadAreasAndAssignments = async () => {
-    try {
-      // Fetch all areas
-      const areasRes = await fetch('/api/admin/areas');
-      if (areasRes.ok) {
-        const areasData = await areasRes.json();
-        setAreas(areasData);
-      }
-
-      // Fetch user's assigned areas
-      const sessionRes = await fetch('/api/auth/session');
-      if (sessionRes.ok) {
-        const session = await sessionRes.json();
-        if (session?.user?.id) {
-          const assignedRes = await fetch(`/api/admin/users/${session.user.id}/areas`);
-          if (assignedRes.ok) {
-            const assignedData = await assignedRes.json();
-            const assignedIds = assignedData.map((a: any) => a.areaId).filter(Boolean);
-            setAssignedAreaIds(assignedIds);
-            // Auto-enable assigned areas by default
-            setSelectedAreaIds(assignedIds);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error loading areas:", error);
-    }
-  };
+  }, [showArchived]);
 
   const loadOvertimes = async () => {
     setLoading(true);
     try {
-      let url = `/api/overtime?showArchived=${showArchived}`;
-      // Add area filter if areas are selected
-      if (selectedAreaIds.length > 0) {
-        url += `&areaIds=${encodeURIComponent(JSON.stringify(selectedAreaIds))}`;
-      }
-      const response = await fetch(url);
+      const response = await fetch(`/api/overtime?showArchived=${showArchived}`);
       if (response.ok) {
         const data = await response.json();
         setOvertimes(data);
@@ -354,10 +311,6 @@ export default function OvertimeDashboard() {
               setShowCancellationPending(filters.showCancellationPending);
               setShowArchived(filters.showArchived);
             }}
-            areas={areas}
-            selectedAreaIds={selectedAreaIds}
-            assignedAreaIds={assignedAreaIds}
-            onAreaChange={setSelectedAreaIds}
           />
         </div>
 
@@ -383,18 +336,13 @@ export default function OvertimeDashboard() {
                     borderColor: bgColor,
                   }}
                 >
-                  {/* AREA NAME - Main Title (Largest Bold Text at Top) */}
-                  <div className={`font-extrabold text-3xl mb-2 ${textColor} uppercase`}>
-                    {ot.areaShiftColour?.area.name || ot.area?.name}
-                  </div>
-
-                  {/* SHIFT COLOUR NAME - Secondary Heading */}
-                  <div className={`font-bold text-xl mb-3 ${textColor}`}>
+                  {/* SHIFT COLOUR NAME - Large Bold Text at Top */}
+                  <div className={`font-bold text-2xl mb-3 ${textColor} uppercase`}>
                     {ot.areaShiftColour?.shiftColour.name || ot.shiftColour?.name}
                   </div>
 
                   {/* Full Date Format */}
-                  <div className={`font-semibold text-base mb-2 ${textColor}`}>
+                  <div className={`font-semibold text-lg mb-2 ${textColor}`}>
                     {new Date(ot.date).toLocaleDateString("en-GB", {
                       weekday: "long",
                       day: "numeric",
@@ -403,8 +351,13 @@ export default function OvertimeDashboard() {
                     })}
                   </div>
 
+                  {/* Area Name */}
+                  <div className={`mb-2 ${textColor} opacity-90 font-semibold`}>
+                    {ot.areaShiftColour?.area.name || ot.area?.name}
+                  </div>
+
                   {/* Time Range */}
-                  <div className={`text-sm mb-3 ${textColor} opacity-90`}>
+                  <div className={`text-sm mb-3 ${textColor} opacity-80`}>
                     {ot.startTime} – {ot.endTime}
                   </div>
 

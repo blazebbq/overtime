@@ -186,6 +186,70 @@ export default function OvertimePostApplicationsPage({
     }
   };
 
+  const handleApproveCancellation = async (applicationId: string) => {
+    if (!confirm("Are you sure you want to approve this cancellation request?")) {
+      return;
+    }
+
+    setProcessingId(applicationId);
+    setError(null);
+    
+    try {
+      const res = await fetch("/api/manager/cancellation-approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "APPROVE",
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to approve cancellation");
+      }
+
+      await loadPost();
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectCancellation = async (applicationId: string) => {
+    const reason = prompt("Please provide a reason for rejecting this cancellation request:");
+    if (!reason) return;
+
+    setProcessingId(applicationId);
+    setError(null);
+    
+    try {
+      const res = await fetch("/api/manager/cancellation-approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          action: "REJECT",
+          rejectionReason: reason,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to reject cancellation");
+      }
+
+      await loadPost();
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   if (status === "loading" || loading) {
     return (
       <>
@@ -410,20 +474,53 @@ export default function OvertimePostApplicationsPage({
             <h2 className="text-2xl font-bold text-white mb-4">
               Cancellation Pending ({cancelPendingApplications.length})
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {cancelPendingApplications.map((app) => (
                 <div
                   key={app.id}
-                  className="p-4 rounded-lg bg-orange-900/20 border border-orange-500/50"
+                  className="p-6 rounded-xl border-2 bg-zinc-800 border-orange-500/50"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className="font-bold text-white">{app.user.name}</div>
-                      <div className="text-sm text-zinc-400">{app.user.email}</div>
+                      <h3 className="text-xl font-bold text-white">{app.user.name}</h3>
+                      <p className="text-sm text-zinc-400">{app.user.email}</p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Applied: {new Date(app.createdAt).toLocaleString()}
+                      </p>
                     </div>
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-600 text-white">
                       ⚠️ CANCEL PENDING
                     </span>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="text-sm text-zinc-300">
+                      <strong>Type:</strong> {app.requestType === "FULL" ? "Full Shift" : "Partial Availability"}
+                    </div>
+                    {app.requestType === "PARTIAL" && (
+                      <div className="text-sm text-zinc-300">
+                        <strong>Requested Hours:</strong> {app.requestedStartTime} – {app.requestedEndTime}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleApproveCancellation(app.id)}
+                      disabled={processingId === app.id}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition-colors disabled:opacity-50"
+                    >
+                      <CheckIcon className="w-5 h-5" />
+                      {processingId === app.id ? "Approving..." : "Approve Cancellation"}
+                    </button>
+                    <button
+                      onClick={() => handleRejectCancellation(app.id)}
+                      disabled={processingId === app.id}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold transition-colors disabled:opacity-50"
+                    >
+                      <XMarkIcon className="w-5 h-5" />
+                      {processingId === app.id ? "Rejecting..." : "Reject Cancellation"}
+                    </button>
                   </div>
                 </div>
               ))}

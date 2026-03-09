@@ -18,7 +18,6 @@ type FilterDropdownProps = {
   }) => void;
   areas?: { id: string; name: string }[];
   selectedAreaIds?: string[];
-  assignedAreaIds?: string[];
   onAreaChange?: (areaIds: string[]) => void;
 };
 
@@ -31,7 +30,6 @@ export default function FilterDropdown({
   onFilterChange,
   areas = [],
   selectedAreaIds = [],
-  assignedAreaIds = [],
   onAreaChange,
 }: FilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -156,32 +154,20 @@ export default function FilterDropdown({
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-2">Areas</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {areas.map((area) => {
-                      const isAssigned = assignedAreaIds.includes(area.id);
-                      return (
-                        <label
-                          key={area.id}
-                          className={`flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded ${
-                            isAssigned ? 'bg-blue-50 border border-blue-200' : ''
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedAreaIds.includes(area.id)}
-                            onChange={() => handleAreaToggle(area.id)}
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                          />
-                          <span className={`text-gray-700 ${isAssigned ? 'font-semibold' : ''}`}>
-                            {area.name}
-                            {isAssigned && (
-                              <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded">
-                                Assigned
-                              </span>
-                            )}
-                          </span>
-                        </label>
-                      );
-                    })}
+                    {areas.map((area) => (
+                      <label
+                        key={area.id}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedAreaIds.includes(area.id)}
+                          onChange={() => handleAreaToggle(area.id)}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-700">{area.name}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </>
