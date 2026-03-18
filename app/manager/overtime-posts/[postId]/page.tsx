@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { use } from "react";
 import Header from "../../../components/Header";
-import { CheckIcon, XMarkIcon, ArrowLeftIcon } from "@heroicons/react/24/solid";
+import { CheckIcon, XMarkIcon, ArrowLeftIcon, UserPlusIcon } from "@heroicons/react/24/solid";
 import Link from "next/link";
 
 type Application = {
@@ -56,6 +56,9 @@ export default function OvertimePostApplicationsPage({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedApplicationForCancel, setSelectedApplicationForCancel] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [assigningUser, setAssigningUser] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -66,9 +69,22 @@ export default function OvertimePostApplicationsPage({
         router.push("/");
       } else {
         loadPost();
+        loadUsers();
       }
     }
   }, [status, session, router]);
+
+  const loadUsers = async () => {
+    try {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.filter((u: any) => u.role === "USER"));
+      }
+    } catch (err) {
+      console.error("Failed to load users:", err);
+    }
+  };
 
   const loadPost = async () => {
     setLoading(true);
@@ -250,6 +266,41 @@ export default function OvertimePostApplicationsPage({
     }
   };
 
+  const handleManualAssignment = async () => {
+    if (!selectedUserId) {
+      setError("Please select a user to assign");
+      return;
+    }
+
+    setAssigningUser(true);
+    setError(null);
+    
+    try {
+      const res = await fetch("/api/manager/manual-assignment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          overtimeId: resolvedParams.postId,
+          userId: selectedUserId,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to assign user");
+      }
+
+      setSelectedUserId("");
+      await loadPost();
+      alert("User successfully assigned to overtime");
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
+    } finally {
+      setAssigningUser(false);
+    }
+  };
+
   if (status === "loading" || loading) {
     return (
       <>
@@ -333,6 +384,41 @@ export default function OvertimePostApplicationsPage({
         {error && (
           <div className="p-4 bg-red-900/50 border-2 border-red-500 rounded-xl text-red-200">
             {error}
+          </div>
+        )}
+
+        {/* Manual Assignment */}
+        {post.approvedCount < post.requiredPeople && (
+          <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              <UserPlusIcon className="w-6 h-6" />
+              Manually Assign User
+            </h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Assign a user to this overtime shift who has verbally agreed but hasn't applied.
+            </p>
+            <div className="flex gap-3">
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="flex-1 px-4 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={assigningUser}
+              >
+                <option value="">Select a user...</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.email})
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleManualAssignment}
+                disabled={assigningUser || !selectedUserId}
+                className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {assigningUser ? "Assigning..." : "Assign User"}
+              </button>
+            </div>
           </div>
         )}
 

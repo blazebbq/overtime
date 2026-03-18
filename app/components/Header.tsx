@@ -98,6 +98,12 @@ export default function Header() {
       show: true,
     },
     {
+      label: "Overtime Rota",
+      icon: ClipboardDocumentListIcon,
+      href: "/overtime-rota",
+      show: true,
+    },
+    {
       label: "Inbox",
       icon: InboxIcon,
       href: "/inbox",
