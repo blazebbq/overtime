@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { createInboxItem } from "@/lib/inbox";
+import { notifyManagersOfNewApplication } from "@/lib/managerNotifications";
 
 // GET - List applications (for current user or admin)
 export async function GET(req: NextRequest) {
@@ -222,6 +223,9 @@ export async function POST(req: Request) {
       areaId: overtime.areaId,
       shiftColourId: overtime.shiftColourId,
     });
+
+    // Send email notification to managers/admins
+    await notifyManagersOfNewApplication(application.id, overtimeId, user.id);
 
     return NextResponse.json(application);
   } catch (err) {

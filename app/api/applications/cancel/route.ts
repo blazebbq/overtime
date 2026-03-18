@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { sendApplicationStatusEmail } from "@/lib/email";
 import { createInboxItem } from "@/lib/inbox";
+import { notifyManagersOfCancellationRequest } from "@/lib/managerNotifications";
 
 // POST - Cancel an application
 export async function POST(req: Request) {
@@ -193,6 +194,9 @@ export async function POST(req: Request) {
         areaId: application.overtime.areaId,
         shiftColourId: application.overtime.shiftColourId,
       });
+
+      // Send email notification to managers/admins
+      await notifyManagersOfCancellationRequest(application.id);
 
       return NextResponse.json(updatedApp);
     }
