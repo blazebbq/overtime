@@ -462,7 +462,7 @@ export default function OvertimeDashboard() {
                               ⏳ Pending Approval
                             </div>
                             {userApplication.assignedManager && (
-                              <div className={`text-xs ${textColor} bg-white bg-opacity-20 rounded-lg p-2 text-center`}>
+                              <div className="text-xs text-gray-900 bg-white bg-opacity-90 rounded-lg p-2 text-center">
                                 <span className="font-semibold">Waiting with: {userApplication.assignedManager.name}</span>
                               </div>
                             )}
@@ -499,7 +499,7 @@ export default function OvertimeDashboard() {
                               ⚠️ Cancellation Pending
                             </div>
                             {userApplication && userApplication.assignedManager && (
-                              <div className={`text-xs ${textColor} bg-white bg-opacity-20 rounded-lg p-2 text-center`}>
+                              <div className="text-xs text-gray-900 bg-white bg-opacity-90 rounded-lg p-2 text-center">
                                 <span className="font-semibold">Waiting with: {userApplication.assignedManager.name}</span>
                               </div>
                             )}
