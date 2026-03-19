@@ -86,6 +86,14 @@ export async function GET(req: NextRequest) {
     
     const approvedApps = ot.applications.filter(app => app.status === "APPROVED");
     
+    // Check if there are any CANCEL_PENDING applications for this overtime
+    const cancellationPendingCount = await prisma.overtimeApplication.count({
+      where: {
+        overtimeId: ot.id,
+        status: "CANCEL_PENDING",
+      },
+    });
+    
     // For pending or cancellation pending applications, find assigned manager
     let assignedManager = null;
     if (userApplication && (userApplication.status === "PENDING_APPROVAL" || userApplication.status === "CANCEL_PENDING") && user) {
@@ -130,6 +138,8 @@ export async function GET(req: NextRequest) {
       acceptedWorkers: approvedApps.map(app => ({
         name: app.user.name,
       })),
+      // Add flag to indicate if there are pending cancellations
+      hasCancellationPending: cancellationPendingCount > 0,
     };
   }));
 

@@ -18,6 +18,7 @@ type Overtime = {
   approvedCount: number;
   status: string;
   acceptedWorkers: { name: string }[];
+  hasCancellationPending?: boolean;
   userApplication?: {
     id: string;
     status: string;
@@ -554,13 +555,21 @@ export default function OvertimeDashboard() {
                               ⏱ Apply with Different Hours
                             </button>
                           </div>
+                        ) : ot.hasCancellationPending ? (
+                          <div className="w-full py-2 px-3 rounded-lg bg-orange-500 text-white font-semibold text-center text-sm">
+                            ⚠️ Pending Cancellation
+                          </div>
                         ) : (
                           <div className="w-full py-2 px-3 rounded-lg bg-gray-500 text-white font-semibold text-center text-sm">
                             Fully Staffed
                           </div>
                         );
                       } else if (isFull) {
-                        return (
+                        return ot.hasCancellationPending ? (
+                          <div className="w-full py-2 px-3 rounded-lg bg-orange-500 text-white font-semibold text-center text-sm">
+                            ⚠️ Pending Cancellation
+                          </div>
+                        ) : (
                           <div className="w-full py-2 px-3 rounded-lg bg-gray-500 text-white font-semibold text-center text-sm">
                             Fully Staffed
                           </div>
