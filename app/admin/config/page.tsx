@@ -14,6 +14,7 @@ import {
   SwatchIcon,
   CalendarIcon,
   UserGroupIcon,
+  AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/solid";
 
 type Area = {
@@ -88,7 +89,7 @@ type User = {
   role: string;
 };
 
-type TabType = "areas" | "shift-colours" | "shift-patterns" | "manager-assignments";
+type TabType = "areas" | "shift-colours" | "shift-patterns" | "manager-assignments" | "settings";
 
 export default function ConfigPage() {
   const { data: session, status } = useSession();
@@ -178,6 +179,17 @@ export default function ConfigPage() {
             <UserGroupIcon className="w-5 h-5 inline mr-2" />
             Manager Assignments
           </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`px-6 py-3 font-semibold transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === "settings"
+                ? "border-blue-500 text-blue-400"
+                : "border-transparent text-zinc-400 hover:text-zinc-300"
+            }`}
+          >
+            <AdjustmentsHorizontalIcon className="w-5 h-5 inline mr-2" />
+            Settings
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -185,6 +197,7 @@ export default function ConfigPage() {
         {activeTab === "shift-colours" && <ShiftColoursTab />}
         {activeTab === "shift-patterns" && <ShiftPatternsTab />}
         {activeTab === "manager-assignments" && <ManagerAssignmentsTab />}
+        {activeTab === "settings" && <SettingsTab />}
       </main>
     </>
   );
@@ -2074,6 +2087,140 @@ function CreateManagerAssignmentForm({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// Settings Tab Component
+function SettingsTab() {
+  const [theme, setTheme] = useState<"dark" | "light" | "auto">("dark");
+  const [notification, setNotification] = useState<string>("");
+
+  useEffect(() => {
+    // Load saved theme preference
+    const savedTheme = localStorage.getItem("theme") as "dark" | "light" | "auto" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      applyTheme(savedTheme);
+    }
+  }, []);
+
+  const applyTheme = (selectedTheme: "dark" | "light" | "auto") => {
+    const root = document.documentElement;
+    
+    if (selectedTheme === "auto") {
+      // Use system preference
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      root.classList.toggle("dark", prefersDark);
+    } else {
+      root.classList.toggle("dark", selectedTheme === "dark");
+    }
+  };
+
+  const handleThemeChange = (newTheme: "dark" | "light" | "auto") => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    applyTheme(newTheme);
+    setNotification(`Theme changed to ${newTheme === "auto" ? "Auto (System)" : newTheme === "dark" ? "Dark" : "Light"}`);
+    setTimeout(() => setNotification(""), 3000);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800">
+        <h2 className="text-2xl font-bold text-white mb-4">Application Settings</h2>
+        
+        {notification && (
+          <div className="mb-4 bg-green-900/30 border border-green-700 text-green-300 px-4 py-3 rounded-lg text-sm">
+            {notification}
+          </div>
+        )}
+
+        {/* Theme Selector */}
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Theme</h3>
+            <p className="text-zinc-400 text-sm mb-4">
+              Choose the appearance of the application
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Dark Theme */}
+            <button
+              onClick={() => handleThemeChange("dark")}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                theme === "dark"
+                  ? "border-blue-500 bg-zinc-800"
+                  : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white font-semibold">Dark</span>
+                {theme === "dark" && (
+                  <CheckIcon className="w-5 h-5 text-blue-500" />
+                )}
+              </div>
+              <div className="bg-zinc-900 rounded p-3 text-zinc-400 text-xs">
+                <div className="mb-1 text-white">Preview</div>
+                <div className="h-2 bg-zinc-700 rounded mb-1"></div>
+                <div className="h-2 bg-zinc-700 rounded w-2/3"></div>
+              </div>
+            </button>
+
+            {/* Light Theme */}
+            <button
+              onClick={() => handleThemeChange("light")}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                theme === "light"
+                  ? "border-blue-500 bg-zinc-800"
+                  : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white font-semibold">Light</span>
+                {theme === "light" && (
+                  <CheckIcon className="w-5 h-5 text-blue-500" />
+                )}
+              </div>
+              <div className="bg-white rounded p-3 text-gray-600 text-xs">
+                <div className="mb-1 text-gray-900">Preview</div>
+                <div className="h-2 bg-gray-300 rounded mb-1"></div>
+                <div className="h-2 bg-gray-300 rounded w-2/3"></div>
+              </div>
+            </button>
+
+            {/* Auto Theme */}
+            <button
+              onClick={() => handleThemeChange("auto")}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                theme === "auto"
+                  ? "border-blue-500 bg-zinc-800"
+                  : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white font-semibold">Auto</span>
+                {theme === "auto" && (
+                  <CheckIcon className="w-5 h-5 text-blue-500" />
+                )}
+              </div>
+              <div className="bg-gradient-to-r from-zinc-900 to-white rounded p-3 text-xs">
+                <div className="mb-1 text-white">System</div>
+                <div className="h-2 bg-zinc-600 rounded mb-1"></div>
+                <div className="h-2 bg-zinc-600 rounded w-2/3"></div>
+              </div>
+            </button>
+          </div>
+
+          <p className="text-zinc-500 text-xs">
+            {theme === "auto" 
+              ? "Theme will automatically match your system preferences"
+              : `Currently using ${theme} theme`
+            }
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
