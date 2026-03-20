@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const month = searchParams.get("month");
     const year = searchParams.get("year");
+    const areaIdsParam = searchParams.get("areaIds");
 
     if (!month || !year) {
       return NextResponse.json(
@@ -36,14 +37,33 @@ export async function GET(req: NextRequest) {
     const startDate = new Date(yearNum, monthNum - 1, 1);
     const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
 
+    // Parse areaIds if provided
+    let areaIds: string[] | undefined;
+    if (areaIdsParam) {
+      try {
+        areaIds = JSON.parse(areaIdsParam);
+      } catch {
+        // Fallback to comma-separated
+        areaIds = areaIdsParam.split(",").filter(Boolean);
+      }
+    }
+
+    // Build where clause
+    const where: any = {
+      date: {
+        gte: startDate,
+        lte: endDate,
+      },
+    };
+
+    // Add area filter if provided
+    if (areaIds && areaIds.length > 0) {
+      where.areaId = { in: areaIds };
+    }
+
     // Fetch all overtime requests for the month
     const overtimeRequests = await prisma.overtimeRequest.findMany({
-      where: {
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
+      where,
       include: {
         area: true,
         shiftColour: true,

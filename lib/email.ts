@@ -1,29 +1,50 @@
 import nodemailer from "nodemailer";
+import { prisma } from "./prisma";
 
-// Email configuration
-const smtpConfig = {
-  host: process.env.SMTP_HOST || "localhost",
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: process.env.SMTP_SECURE === "true",
-  auth:
-    process.env.SMTP_USER && process.env.SMTP_PASSWORD
-      ? {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASSWORD,
-        }
-      : undefined,
-};
-
-const fromEmail = process.env.SMTP_FROM || "noreply@overtime.example.com";
-
-// Create transporter
-let transporter: nodemailer.Transporter | null = null;
-
-function getTransporter() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport(smtpConfig);
+// Get SMTP configuration from database
+async function getSmtpConfig() {
+  try {
+    const config = await prisma.smtpConfig.findFirst({
+      orderBy: { updatedAt: "desc" },
+    });
+    
+    if (!config || !config.enabled) {
+      console.log("[Email Disabled] SMTP config not found or disabled");
+      return null;
+    }
+    
+    return config;
+  } catch (error) {
+    console.error("[Email] Failed to fetch SMTP config:", error);
+    return null;
   }
-  return transporter;
+}
+
+// Create transporter with database config
+async function getTransporter() {
+  const config = await getSmtpConfig();
+  
+  if (!config) {
+    return null;
+  }
+  
+  const transportConfig: any = {
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    tls: {
+      rejectUnauthorized: false, // Allow self-signed certificates
+    },
+  };
+  
+  if (config.user && config.password) {
+    transportConfig.auth = {
+      user: config.user,
+      pass: config.password,
+    };
+  }
+  
+  return nodemailer.createTransport(transportConfig);
 }
 
 // Email templates
@@ -362,7 +383,17 @@ export async function sendApplicationStatusEmail(
   applicationId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const transport = getTransporter();
+    const transport = await getTransporter();
+    
+    if (!transport) {
+      console.log("[Email Disabled] Skipping email send - SMTP not configured or disabled");
+      return { success: false, error: "Email service disabled" };
+    }
+    
+    const config = await getSmtpConfig();
+    if (!config) {
+      return { success: false, error: "Email service disabled" };
+    }
 
     // Determine email content based on status
     let subject: string;
@@ -414,7 +445,7 @@ export async function sendApplicationStatusEmail(
 
     // Send email
     const info = await transport.sendMail({
-      from: fromEmail,
+      from: config.fromEmail,
       to: recipients.join(", "),
       subject,
       html,
@@ -459,12 +490,22 @@ export async function sendGenericEmail(
   html: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const transport = getTransporter();
+    const transport = await getTransporter();
+    
+    if (!transport) {
+      console.log("[Email Disabled] Skipping email send - SMTP not configured or disabled");
+      return { success: false, error: "Email service disabled" };
+    }
+    
+    const config = await getSmtpConfig();
+    if (!config) {
+      return { success: false, error: "Email service disabled" };
+    }
     
     const recipients = Array.isArray(to) ? to : [to];
     
     const info = await transport.sendMail({
-      from: fromEmail,
+      from: config.fromEmail,
       to: recipients.join(", "),
       subject,
       html,

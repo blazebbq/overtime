@@ -294,3 +294,16 @@ model UserNotification {
   @@index([postId])
   @@index([applicationId])
 }
+
+model SmtpConfig {
+  id        String   @id @default(cuid())
+  host      String
+  port      Int
+  secure    Boolean
+  user      String?
+  password  String?
+  fromEmail String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
