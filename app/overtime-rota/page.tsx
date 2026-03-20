@@ -17,6 +17,12 @@ interface RotaEntry {
   approvedCount: number;
 }
 
+interface Area {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
+
 interface RotaData {
   month: number;
   year: number;
@@ -31,6 +37,9 @@ export default function OvertimeRotaPage() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [rotaData, setRotaData] = useState<RotaData | null>(null);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
+  const [showAreaFilter, setShowAreaFilter] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,17 +50,36 @@ export default function OvertimeRotaPage() {
   }, [status, router]);
 
   useEffect(() => {
+    loadAreas();
+  }, []);
+
+  useEffect(() => {
     fetchRotaData();
-  }, [month, year]);
+  }, [month, year, selectedAreaIds]);
+
+  const loadAreas = async () => {
+    try {
+      const res = await fetch("/api/admin/areas");
+      const data = await res.json();
+      const enabledAreas = data.filter((a: Area) => a.enabled);
+      setAreas(enabledAreas);
+    } catch (err) {
+      console.error("Failed to load areas:", err);
+    }
+  };
 
   const fetchRotaData = async () => {
     setLoading(true);
     setError("");
     
     try {
-      const response = await fetch(
-        `/api/overtime/rota?month=${month}&year=${year}`
-      );
+      let url = `/api/overtime/rota?month=${month}&year=${year}`;
+      
+      if (selectedAreaIds.length > 0) {
+        url += `&areaIds=${JSON.stringify(selectedAreaIds)}`;
+      }
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error("Failed to fetch rota data");
@@ -139,6 +167,69 @@ export default function OvertimeRotaPage() {
                     )
                   )}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Areas
+                </label>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAreaFilter(!showAreaFilter)}
+                    className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left min-w-[150px]"
+                  >
+                    {selectedAreaIds.length === 0
+                      ? "All Areas"
+                      : selectedAreaIds.length === areas.length
+                      ? "All Areas"
+                      : `${selectedAreaIds.length} selected`}
+                  </button>
+                  
+                  {showAreaFilter && (
+                    <div className="absolute z-10 mt-1 w-64 bg-white border border-gray-300 rounded-md shadow-lg">
+                      <div className="p-2 max-h-64 overflow-y-auto">
+                        <label className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedAreaIds.length === areas.length || selectedAreaIds.length === 0}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedAreaIds([]);
+                              } else {
+                                setSelectedAreaIds(areas.map(a => a.id));
+                              }
+                            }}
+                            className="mr-2"
+                          />
+                          <span className="font-medium">All Areas</span>
+                        </label>
+                        <hr className="my-1" />
+                        {areas.map((area) => (
+                          <label key={area.id} className="flex items-center p-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedAreaIds.length === 0 || selectedAreaIds.includes(area.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  if (selectedAreaIds.length === 0) {
+                                    // Was "all", now select just this one
+                                    setSelectedAreaIds([area.id]);
+                                  } else {
+                                    setSelectedAreaIds([...selectedAreaIds, area.id]);
+                                  }
+                                } else {
+                                  setSelectedAreaIds(selectedAreaIds.filter(id => id !== area.id));
+                                }
+                              }}
+                              className="mr-2"
+                            />
+                            <span>{area.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-end gap-2">
