@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Header from "@/app/components/Header";
+import SmtpSettings from "./SmtpSettings";
 import {
   PlusIcon,
   PencilIcon,
@@ -89,7 +90,7 @@ type User = {
   role: string;
 };
 
-type TabType = "areas" | "shift-colours" | "shift-patterns" | "manager-assignments" | "settings";
+type TabType = "areas" | "shift-colours" | "manager-assignments" | "smtp-settings";
 
 export default function ConfigPage() {
   const { data: session, status } = useSession();
@@ -158,17 +159,6 @@ export default function ConfigPage() {
             Shift Colours
           </button>
           <button
-            onClick={() => setActiveTab("shift-patterns")}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === "shift-patterns"
-                ? "border-blue-500 text-blue-400"
-                : "border-transparent text-zinc-400 hover:text-zinc-300"
-            }`}
-          >
-            <CalendarIcon className="w-5 h-5 inline mr-2" />
-            Shift Patterns
-          </button>
-          <button
             onClick={() => setActiveTab("manager-assignments")}
             className={`px-6 py-3 font-semibold transition-colors border-b-2 whitespace-nowrap ${
               activeTab === "manager-assignments"
@@ -180,24 +170,23 @@ export default function ConfigPage() {
             Manager Assignments
           </button>
           <button
-            onClick={() => setActiveTab("settings")}
+            onClick={() => setActiveTab("smtp-settings")}
             className={`px-6 py-3 font-semibold transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === "settings"
+              activeTab === "smtp-settings"
                 ? "border-blue-500 text-blue-400"
                 : "border-transparent text-zinc-400 hover:text-zinc-300"
             }`}
           >
             <AdjustmentsHorizontalIcon className="w-5 h-5 inline mr-2" />
-            Settings
+            SMTP Settings
           </button>
         </div>
 
         {/* Tab Content */}
         {activeTab === "areas" && <AreasTab />}
         {activeTab === "shift-colours" && <ShiftColoursTab />}
-        {activeTab === "shift-patterns" && <ShiftPatternsTab />}
         {activeTab === "manager-assignments" && <ManagerAssignmentsTab />}
-        {activeTab === "settings" && <SettingsTab />}
+        {activeTab === "smtp-settings" && <SmtpSettingsTab />}
       </main>
     </>
   );
@@ -2223,4 +2212,9 @@ function SettingsTab() {
       </div>
     </div>
   );
+}
+
+// SMTP Settings Tab Component
+function SmtpSettingsTab() {
+  return <SmtpSettings />;
 }
