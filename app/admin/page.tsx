@@ -11,6 +11,7 @@ import {
   ArchiveBoxIcon,
   XCircleIcon,
   MapPinIcon,
+  KeyIcon,
 } from "@heroicons/react/24/solid";
 
 type User = {
@@ -65,7 +66,9 @@ export default function AdminDashboard() {
   const [showCreateOvertime, setShowCreateOvertime] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showAreaAssignment, setShowAreaAssignment] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState<string>("");
 
   // Check admin access
   useEffect(() => {
@@ -157,6 +160,30 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error("Failed to delete user:", err);
       alert("An error occurred while deleting the user");
+    }
+  };
+
+  const handlePasswordReset = async (userId: string, newPassword: string) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to reset password");
+        return false;
+      }
+
+      alert("Password reset successfully");
+      return true;
+    } catch (err) {
+      console.error("Failed to reset password:", err);
+      alert("An error occurred while resetting the password");
+      return false;
     }
   };
 
@@ -366,6 +393,18 @@ export default function AdminDashboard() {
                         <MapPinIcon className="w-4 h-4" />
                         Assign Areas
                       </button>
+                      <button
+                        onClick={() => {
+                          setSelectedUserId(user.id);
+                          setSelectedUserName(user.name);
+                          setShowPasswordReset(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white font-semibold text-sm transition-colors"
+                        title="Reset Password"
+                      >
+                        <KeyIcon className="w-4 h-4" />
+                        Reset Password
+                      </button>
                       <select
                         value={user.role}
                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -400,6 +439,20 @@ export default function AdminDashboard() {
               setShowAreaAssignment(false);
               setSelectedUserId(null);
             }}
+          />
+        )}
+
+        {/* Password Reset Modal */}
+        {showPasswordReset && selectedUserId && (
+          <PasswordResetModal
+            userId={selectedUserId}
+            userName={selectedUserName}
+            onClose={() => {
+              setShowPasswordReset(false);
+              setSelectedUserId(null);
+              setSelectedUserName("");
+            }}
+            onReset={handlePasswordReset}
           />
         )}
       </main>
@@ -953,6 +1006,116 @@ function AreaAssignmentModal({
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Password Reset Modal Component
+function PasswordResetModal({
+  userId,
+  userName,
+  onClose,
+  onReset,
+}: {
+  userId: string;
+  userName: string;
+  onClose: () => void;
+  onReset: (userId: string, password: string) => Promise<boolean>;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!password) {
+      setError("Password is required");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+    const success = await onReset(userId, password);
+    setLoading(false);
+
+    if (success) {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-900 rounded-lg p-6 max-w-md w-full border border-zinc-800">
+        <h2 className="text-xl font-bold text-white mb-4">
+          Reset Password for {userName}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900 bg-opacity-50 border border-red-700 text-red-200 px-4 py-2 rounded">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-semibold text-zinc-400 mb-2">
+              New Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter new password"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-zinc-400 mb-2">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Confirm new password"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 rounded-lg font-semibold text-white bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-800 transition-colors"
+            >
+              {loading ? "Resetting..." : "Reset Password"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg font-semibold text-white bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
