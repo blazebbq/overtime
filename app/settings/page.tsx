@@ -20,13 +20,15 @@ export default function SettingsPage() {
   const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
+    if (status === "loading") return;
+    
+    if (!session) {
+      router.replace("/login");
+      return;
     }
-    if (status === "authenticated") {
-      loadProfile();
-    }
-  }, [status, router]);
+    
+    loadProfile();
+  }, [status, session, router]);
 
   const loadProfile = async () => {
     try {

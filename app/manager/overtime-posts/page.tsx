@@ -35,15 +35,18 @@ export default function ManagerOvertimePostsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    } else if (status === "authenticated") {
-      const userRole = (session?.user as { role?: string })?.role;
-      if (userRole !== "MANAGER" && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
-        router.push("/");
-      } else {
-        loadPosts();
-      }
+    if (status === "loading") return;
+    
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+    
+    const userRole = (session?.user as { role?: string })?.role;
+    if (userRole !== "MANAGER" && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      router.replace("/");
+    } else {
+      loadPosts();
     }
   }, [status, session, router]);
 

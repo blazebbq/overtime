@@ -41,7 +41,9 @@ export default function HistoryPage() {
   const [showReportView, setShowReportView] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (status === "loading") return;
+    
+    if (!session) {
       router.push("/login");
     } else if (status === "authenticated") {
       const userRole = (session?.user as { role?: string })?.role;

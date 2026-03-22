@@ -44,10 +44,12 @@ export default function OvertimeRotaPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
+    if (status === "loading") return;
+    
+    if (!session) {
+      router.replace("/login");
     }
-  }, [status, router]);
+  }, [status, session, router]);
 
   useEffect(() => {
     loadAreas();

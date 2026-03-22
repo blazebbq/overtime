@@ -86,7 +86,9 @@ export default function AvailableOvertimePage() {
   const [selectedCancellationOvertime, setSelectedCancellationOvertime] = useState<Overtime | null>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (status === "loading") return;
+    
+    if (!session) {
       router.push("/login");
     }
   }, [status, router]);
@@ -288,7 +290,9 @@ export default function AvailableOvertimePage() {
     alert("Cancellation request submitted successfully! You will receive an email when it's reviewed.");
   };
 
-  if (status === "loading" || status === "unauthenticated") {
+  if (status === "loading" || status === "loading") return;
+    
+    if (!session) {
     return (
       <>
         <Header />

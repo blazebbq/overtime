@@ -85,7 +85,9 @@ export default function MyRequestsPage() {
   const [cancellationReason, setCancellationReason] = useState("");
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (status === "loading") return;
+    
+    if (!session) {
       router.push("/login");
     }
   }, [status, router]);
@@ -181,7 +183,9 @@ export default function MyRequestsPage() {
     }
   };
 
-  if (status === "loading" || status === "unauthenticated") {
+  if (status === "loading" || status === "loading") return;
+    
+    if (!session) {
     return (
       <>
         <Header />
