@@ -75,7 +75,7 @@ export default function AdminDashboard() {
     if (status === "loading") return;
     
     if (!session) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 

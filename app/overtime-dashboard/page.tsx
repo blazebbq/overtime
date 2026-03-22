@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Header from "@/app/components/Header";
 import CancellationRequestModal from "@/app/components/CancellationRequestModal";
 import FilterDropdown from "@/app/components/FilterDropdown";
@@ -55,9 +56,24 @@ function lightenColor(hex: string, percent: number): string {
 }
 
 export default function OvertimeDashboard() {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [overtimes, setOvertimes] = useState<Overtime[]>([]);
+  
+  // Check authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    router.replace("/login");
+    return null;
+  }
   
   // Filters
   const [showAvailable, setShowAvailable] = useState(true);

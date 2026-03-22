@@ -30,8 +30,8 @@ export default function LoginPage() {
         setError("Invalid email or password");
         setLoading(false);
       } else if (result?.ok) {
-        // Force a hard navigation to ensure cookies are set
-        window.location.href = callbackUrl;
+        // Use router.replace to avoid hard reload
+        router.replace(callbackUrl || "/overtime-dashboard");
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
