@@ -88,9 +88,9 @@ export default function MyRequestsPage() {
     if (status === "loading") return;
     
     if (!session) {
-      router.push("/login");
+      router.replace("/login");
     }
-  }, [status, router]);
+  }, [status, session, router]);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -183,9 +183,23 @@ export default function MyRequestsPage() {
     }
   };
 
-  if (status === "loading" || status === "loading") return;
+  if (status === "loading") {
+    return (
+      <>
+        <Header />
+        <main className="p-4 max-w-4xl mx-auto">
+          <div className="text-center text-zinc-400">Loading...</div>
+        </main>
+      </>
+    );
+  }
     
-    if (!session) {
+  if (!session) {
+    router.replace("/login");
+    return null;
+  }
+
+  if (loading) {
     return (
       <>
         <Header />
