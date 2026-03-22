@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
     const pdfBytes = await pdfDoc.save();
 
     // Return PDF
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="overtime-rota-${monthName}-${yearNum}.pdf"`,
