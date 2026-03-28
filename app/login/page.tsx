@@ -95,9 +95,6 @@ function LoginForm() {
           </form>
 
           <div className="mt-6 text-center text-sm text-zinc-400">
-            <p>Test accounts:</p>
-            <p className="mt-1">Admin: admin@test.com / password123</p>
-            <p>User: user@test.com / password123</p>
           </div>
         </div>
       </div>

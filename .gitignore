@@ -46,3 +46,5 @@ next-env.d.ts
 prisma.config.ts.disabled
 
 /app/generated/prisma
+prisma/*.db
+prisma/*.db-journal
