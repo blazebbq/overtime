@@ -8,32 +8,142 @@ datasource db {
 }
 
 model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  secondaryEmail String?  // Optional secondary email for notifications
+  name           String
+  password       String
+  role           String   @default("USER") // USER | ADMIN | MANAGER | SUPER_ADMIN
+  createdAt      DateTime @default(now())
+
+  // Relations
+  bookings           Booking[]
+  applications       OvertimeApplication[]
+  shiftPattern       UserShiftPattern?
+  managedUsers       ManagerAssignment[] @relation("ManagedUsers")
+  managers           ManagerAssignment[] @relation("Managers")
+  createdAuditLogs   AuditLog[]          @relation("AuditLogCreator")
+  affectedAuditLogs  AuditLog[]          @relation("AuditLogAffected")
+}
+
+model Area {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("USER") // USER | ADMIN
+  name      String   @unique // e.g. "SWC2", "SWC4", "SMC2"
+  enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  bookings  Booking[]
+  // Relations
+  shiftColours       AreaShiftColour[]
+  overtimeRequests   OvertimeRequest[]
+  managerAssignments ManagerAssignment[]
+}
+
+model ShiftColour {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g. "Yellow", "Blue", "Red", "Green", "Purple"
+  hexColor  String   // e.g. "#FFD700"
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relations
+  areas              AreaShiftColour[]
+  overtimeRequests   OvertimeRequest[]
+  managerAssignments ManagerAssignment[]
+}
+
+model AreaShiftColour {
+  id            String @id @default(cuid())
+  areaId        String
+  shiftColourId String
+
+  area             Area              @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  shiftColour      ShiftColour       @relation(fields: [shiftColourId], references: [id], onDelete: Cascade)
+  overtimeRequests OvertimeRequest[]
+
+  @@unique([areaId, shiftColourId])
+}
+
+model ShiftPattern {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g. "7-Day Pattern A", "14-Day Pattern B"
+  cycleLength Int      // Number of days in the pattern (7, 14, 28, etc.)
+  patternData String   // JSON string: {"days": [true, true, true, false, false, true, true]} - true = work day
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userAssignments UserShiftPattern[]
+}
+
+model UserShiftPattern {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  shiftPatternId String
+  startDate      DateTime // The date from which this pattern applies
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftPattern ShiftPattern @relation(fields: [shiftPatternId], references: [id])
+  dailyPatterns UserShiftDayPattern[]
+}
+
+// Per-day shift type for detailed tracking
+model UserShiftDayPattern {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  dayType   String   // DDE | DDL | 12N | 8N | 12D | D | OFF
+  createdAt DateTime @default(now())
+
+  userPattern UserShiftPattern @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model ManagerAssignment {
+  id            String  @id @default(cuid())
+  managerId     String  // User with MANAGER role
+  userId        String  // User being managed
+  areaId        String?
+  shiftColourId String?
+
+  manager      User         @relation("Managers", fields: [managerId], references: [id], onDelete: Cascade)
+  user         User         @relation("ManagedUsers", fields: [userId], references: [id], onDelete: Cascade)
+  area         Area?        @relation(fields: [areaId], references: [id])
+  shiftColour  ShiftColour? @relation(fields: [shiftColourId], references: [id])
+
+  @@unique([managerId, userId, areaId, shiftColourId])
 }
 
 model OvertimeRequest {
-  id             String   @id @default(cuid())
+  id                 String   @id @default(cuid())
 
   // Core
-  date           DateTime
-  shift          String   // YELLOW | ORANGE | PURPLE | GREEN
-  startTime      String   // "07:00"
-  endTime        String   // "19:00"
-  requiredPeople Int
+  date               DateTime
+  areaId             String
+  shiftColourId      String
+  areaShiftColourId  String?  // Preferred: Links to AreaShiftColour relation
+  startTime          String   // "07:00"
+  endTime            String   // "19:00"
+  requiredPeople     Int
+  approvedCount      Int      @default(0) // Number of approved applications
 
   // Lifecycle
-  status         String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
+  status             String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
+  archived           Boolean  @default(false) // Auto-archived after 5 days
 
-  createdAt      DateTime @default(now())
+  createdAt          DateTime @default(now())
 
-  bookings       Booking[]
+  // Relations
+  area               Area         @relation(fields: [areaId], references: [id])
+  shiftColour        ShiftColour  @relation(fields: [shiftColourId], references: [id])
+  areaShiftColour    AreaShiftColour? @relation(fields: [areaShiftColourId], references: [id])
+  bookings           Booking[]
+  applications       OvertimeApplication[]
+  approvals          OvertimeApproval[]
+  inboxItems         InboxItem[]
+  userNotifications UserNotification[]
 }
 
 model Booking {
@@ -42,8 +152,158 @@ model Booking {
   overtimeId String
   createdAt  DateTime @default(now())
 
-  user       User            @relation(fields: [userId], references: [id])
-  overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id])
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, overtimeId])
+}
+
+model OvertimeApplication {
+  id                 String    @id @default(cuid())
+  userId             String
+  overtimeId         String
+  
+  // Application type and details
+  requestType        String    // FULL | PARTIAL
+  requestedStartTime String?   // Required for PARTIAL, null for FULL
+  requestedEndTime   String?   // Required for PARTIAL, null for FULL
+  comment            String?   // Optional user comment
+  
+  // Approval status
+  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED_MANUAL | REJECTED_CAPACITY | CANCEL_PENDING | CANCELLED | WITHDRAWN
+  
+  // Approval details (filled when status changes)
+  approvedStartTime  String?   // Manager-approved start time
+  approvedEndTime    String?   // Manager-approved end time
+  approverId         String?   // Manager who approved/rejected
+  rejectionReason    String?   // Reason if rejected manually
+  
+  // Cancellation audit fields
+  cancellationRequestedAt     DateTime? // When cancellation was requested
+  cancellationRequestedReason String?   // User's reason for requesting cancellation
+  cancellationApprovedAt      DateTime? // When cancellation was approved
+  cancellationApprovedById    String?   // Manager who approved cancellation
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  // Relations
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overtime           OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
+  inboxItems         InboxItem[]
+  paySegments        OvertimePaySegment[]
+  userNotifications UserNotification[]
+  
+  // Removed unique constraint to allow reapplication after rejection/cancellation
+  @@index([userId, overtimeId])
+  @@index([overtimeId, status])
+}
+
+// Pay multiplier segments for accurate compensation calculation
+model OvertimePaySegment {
+  id            String   @id @default(cuid())
+  applicationId String
+  segmentStart  DateTime // Start time of this pay segment
+  segmentEnd    DateTime // End time of this pay segment
+  hoursWorked   Float    // Duration in hours
+  multiplier    Float    // Pay multiplier (1.5, 1.75, or 2.0)
+  createdAt     DateTime @default(now())
+
+  application OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+model OvertimeApproval {
+  id              String    @id @default(cuid())
+  overtimeId      String
+  userId          String    // User who worked the overtime
+  approverId      String    // Manager who approved
+  status          String    // PENDING | APPROVED | DECLINED
+  
+  // Hours worked
+  workedAsScheduled Boolean @default(true)
+  actualStartTime   String? // Only if workedAsScheduled = false
+  actualEndTime     String? // Only if workedAsScheduled = false
+  comment           String? // Optional manager comment
+  
+  // Flags
+  breachWarning     Boolean @default(false) // Consecutive day limit breach
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  overtime        OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
+
+  @@unique([overtimeId, userId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // e.g. "APPROVAL_CREATED", "OVERTIME_APPROVED", "USER_ROLE_CHANGED"
+  entityType  String   // e.g. "OvertimeApproval", "User", "OvertimeRequest"
+  entityId    String   // ID of the affected entity
+  creatorId   String   // User who made the change
+  affectedUserId String? // User affected by the change (if applicable)
+  changes     String   // JSON string of changes made
+  createdAt   DateTime @default(now())
+
+  creator       User  @relation("AuditLogCreator", fields: [creatorId], references: [id])
+  affectedUser  User? @relation("AuditLogAffected", fields: [affectedUserId], references: [id])
+}
+
+model InboxItem {
+  id               String    @id @default(cuid())
+  type             String    // APPLICATION_REQUEST | CANCELLATION_REQUEST
+  postId           String    // OvertimeRequest ID
+  applicationId    String    // OvertimeApplication ID
+  requesterUserId  String    // User who made the request
+  assignedToUserId String?   // Manager assigned to handle (nullable if default to superadmin)
+  areaId           String?   // For filtering
+  shiftColourId    String?   // For filtering
+  status           String    @default("UNREAD") // UNREAD | OPEN | RESOLVED
+  createdAt        DateTime  @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  
+  // Relations
+  post             OvertimeRequest     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  application      OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  @@index([assignedToUserId, status])
+  @@index([postId])
+  @@index([applicationId])
+}
+
+model UserNotification {
+  id           String   @id @default(cuid())
+  userId       String   // User receiving the notification
+  type         String   // APPROVED | REJECTED | CANCELLED | AUTO_REJECTED
+  message      String   // Human-readable message
+  postId       String   // OvertimeRequest ID
+  applicationId String  // OvertimeApplication ID
+  status       String   @default("UNREAD") // UNREAD | READ
+  createdAt    DateTime @default(now())
+  readAt       DateTime?
+  
+  // Relations
+  post         OvertimeRequest     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  application  OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, status])
+  @@index([postId])
+  @@index([applicationId])
+}
+
+model SmtpConfig {
+  id        String   @id @default(cuid())
+  host      String
+  port      Int
+  secure    Boolean
+  user      String?
+  password  String?
+  fromEmail String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -1,9 +1,9 @@
-import NextAuth from "next-auth";
+import NextAuth, { AuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-const handler = NextAuth({
+export const authOptions: AuthOptions = {
   providers: [
     Credentials({
       name: "Credentials",
@@ -20,7 +20,7 @@ const handler = NextAuth({
           where: { email: credentials.email },
         });
 
-        if (!user || !user.isActive) {
+        if (!user) {
           return null;
         }
 
@@ -37,17 +37,44 @@ const handler = NextAuth({
           id: user.id,
           name: user.name,
           email: user.email,
-          isAdmin: user.isAdmin,
+          role: user.role,
         };
       },
     }),
   ],
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: "/login",
   },
-});
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = (user as any).role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as any).id = token.id || token.sub;
+        (session.user as any).role = token.role;
+      }
+      return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
