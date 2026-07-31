@@ -68,6 +68,24 @@ export async function requireManager() {
   return { user, error: null };
 }
 
+export async function requireManagerOrAdmin() {
+  const { user, error } = await requireAuth();
+  
+  if (error) {
+    return { user: null, error };
+  }
+  
+  // MANAGER, ADMIN, and SUPER_ADMIN can create overtime
+  if (user?.role !== "MANAGER" && user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    return {
+      error: NextResponse.json({ error: "Manager or Admin access required" }, { status: 403 }),
+      user: null
+    };
+  }
+  
+  return { user, error: null };
+}
+
 export async function requireSuperAdmin() {
   const { user, error } = await requireAuth();
   

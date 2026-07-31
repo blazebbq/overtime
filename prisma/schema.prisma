@@ -8,15 +8,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("USER") // USER | ADMIN | MANAGER | SUPER_ADMIN
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  email          String   @unique
+  secondaryEmail String?  // Optional secondary email for notifications
+  name           String
+  password       String
+  role           String   @default("USER") // USER | ADMIN | MANAGER | SUPER_ADMIN
+  createdAt      DateTime @default(now())
 
   // Relations
   bookings           Booking[]
+  applications       OvertimeApplication[]
   shiftPattern       UserShiftPattern?
   managedUsers       ManagerAssignment[] @relation("ManagedUsers")
   managers           ManagerAssignment[] @relation("Managers")
@@ -54,8 +56,9 @@ model AreaShiftColour {
   areaId        String
   shiftColourId String
 
-  area        Area        @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  shiftColour ShiftColour @relation(fields: [shiftColourId], references: [id], onDelete: Cascade)
+  area             Area              @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  shiftColour      ShiftColour       @relation(fields: [shiftColourId], references: [id], onDelete: Cascade)
+  overtimeRequests OvertimeRequest[]
 
   @@unique([areaId, shiftColourId])
 }
@@ -81,6 +84,21 @@ model UserShiftPattern {
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   shiftPattern ShiftPattern @relation(fields: [shiftPatternId], references: [id])
+  dailyPatterns UserShiftDayPattern[]
+}
+
+// Per-day shift type for detailed tracking
+model UserShiftDayPattern {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  dayType   String   // DDE | DDL | 12N | 8N | 12D | D | OFF
+  createdAt DateTime @default(now())
+
+  userPattern UserShiftPattern @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
 
 model ManagerAssignment {
@@ -99,26 +117,33 @@ model ManagerAssignment {
 }
 
 model OvertimeRequest {
-  id             String   @id @default(cuid())
+  id                 String   @id @default(cuid())
 
   // Core
-  date           DateTime
-  areaId         String
-  shiftColourId  String
-  startTime      String   // "07:00"
-  endTime        String   // "19:00"
-  requiredPeople Int
+  date               DateTime
+  areaId             String
+  shiftColourId      String
+  areaShiftColourId  String?  // Preferred: Links to AreaShiftColour relation
+  startTime          String   // "07:00"
+  endTime            String   // "19:00"
+  requiredPeople     Int
+  approvedCount      Int      @default(0) // Number of approved applications
 
   // Lifecycle
-  status         String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
+  status             String   @default("OPEN") // OPEN | FULL | CLOSED | ARCHIVED
+  archived           Boolean  @default(false) // Auto-archived after 5 days
 
-  createdAt      DateTime @default(now())
+  createdAt          DateTime @default(now())
 
   // Relations
-  area           Area         @relation(fields: [areaId], references: [id])
-  shiftColour    ShiftColour  @relation(fields: [shiftColourId], references: [id])
-  bookings       Booking[]
-  approvals      OvertimeApproval[]
+  area               Area         @relation(fields: [areaId], references: [id])
+  shiftColour        ShiftColour  @relation(fields: [shiftColourId], references: [id])
+  areaShiftColour    AreaShiftColour? @relation(fields: [areaShiftColourId], references: [id])
+  bookings           Booking[]
+  applications       OvertimeApplication[]
+  approvals          OvertimeApproval[]
+  inboxItems         InboxItem[]
+  userNotifications UserNotification[]
 }
 
 model Booking {
@@ -131,6 +156,62 @@ model Booking {
   overtime   OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, overtimeId])
+}
+
+model OvertimeApplication {
+  id                 String    @id @default(cuid())
+  userId             String
+  overtimeId         String
+  
+  // Application type and details
+  requestType        String    // FULL | PARTIAL
+  requestedStartTime String?   // Required for PARTIAL, null for FULL
+  requestedEndTime   String?   // Required for PARTIAL, null for FULL
+  comment            String?   // Optional user comment
+  
+  // Approval status
+  status             String    @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED_MANUAL | REJECTED_CAPACITY | CANCEL_PENDING | CANCELLED | WITHDRAWN
+  
+  // Approval details (filled when status changes)
+  approvedStartTime  String?   // Manager-approved start time
+  approvedEndTime    String?   // Manager-approved end time
+  approverId         String?   // Manager who approved/rejected
+  rejectionReason    String?   // Reason if rejected manually
+  
+  // Cancellation audit fields
+  cancellationRequestedAt     DateTime? // When cancellation was requested
+  cancellationRequestedReason String?   // User's reason for requesting cancellation
+  cancellationApprovedAt      DateTime? // When cancellation was approved
+  cancellationApprovedById    String?   // Manager who approved cancellation
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  // Relations
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overtime           OvertimeRequest @relation(fields: [overtimeId], references: [id], onDelete: Cascade)
+  inboxItems         InboxItem[]
+  paySegments        OvertimePaySegment[]
+  userNotifications UserNotification[]
+  
+  // Removed unique constraint to allow reapplication after rejection/cancellation
+  @@index([userId, overtimeId])
+  @@index([overtimeId, status])
+}
+
+// Pay multiplier segments for accurate compensation calculation
+model OvertimePaySegment {
+  id            String   @id @default(cuid())
+  applicationId String
+  segmentStart  DateTime // Start time of this pay segment
+  segmentEnd    DateTime // End time of this pay segment
+  hoursWorked   Float    // Duration in hours
+  multiplier    Float    // Pay multiplier (1.5, 1.75, or 2.0)
+  createdAt     DateTime @default(now())
+
+  application OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
 }
 
 model OvertimeApproval {
@@ -169,4 +250,60 @@ model AuditLog {
 
   creator       User  @relation("AuditLogCreator", fields: [creatorId], references: [id])
   affectedUser  User? @relation("AuditLogAffected", fields: [affectedUserId], references: [id])
+}
+
+model InboxItem {
+  id               String    @id @default(cuid())
+  type             String    // APPLICATION_REQUEST | CANCELLATION_REQUEST
+  postId           String    // OvertimeRequest ID
+  applicationId    String    // OvertimeApplication ID
+  requesterUserId  String    // User who made the request
+  assignedToUserId String?   // Manager assigned to handle (nullable if default to superadmin)
+  areaId           String?   // For filtering
+  shiftColourId    String?   // For filtering
+  status           String    @default("UNREAD") // UNREAD | OPEN | RESOLVED
+  createdAt        DateTime  @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  
+  // Relations
+  post             OvertimeRequest     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  application      OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  @@index([assignedToUserId, status])
+  @@index([postId])
+  @@index([applicationId])
+}
+
+model UserNotification {
+  id           String   @id @default(cuid())
+  userId       String   // User receiving the notification
+  type         String   // APPROVED | REJECTED | CANCELLED | AUTO_REJECTED
+  message      String   // Human-readable message
+  postId       String   // OvertimeRequest ID
+  applicationId String  // OvertimeApplication ID
+  status       String   @default("UNREAD") // UNREAD | READ
+  createdAt    DateTime @default(now())
+  readAt       DateTime?
+  
+  // Relations
+  post         OvertimeRequest     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  application  OvertimeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, status])
+  @@index([postId])
+  @@index([applicationId])
+}
+
+model SmtpConfig {
+  id        String   @id @default(cuid())
+  host      String
+  port      Int
+  secure    Boolean
+  user      String?
+  password  String?
+  fromEmail String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

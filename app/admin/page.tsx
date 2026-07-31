@@ -10,6 +10,8 @@ import {
   ClockIcon,
   ArchiveBoxIcon,
   XCircleIcon,
+  MapPinIcon,
+  KeyIcon,
 } from "@heroicons/react/24/solid";
 
 type User = {
@@ -48,9 +50,10 @@ type Area = {
 
 type ShiftColour = {
   id: string;
+  areaShiftColourId: string;
   name: string;
-  hexColour: string;
-  areaId: string;
+  hexColor: string;
+  enabled: boolean;
 };
 
 export default function AdminDashboard() {
@@ -62,13 +65,17 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showCreateOvertime, setShowCreateOvertime] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showAreaAssignment, setShowAreaAssignment] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState<string>("");
 
   // Check admin access
   useEffect(() => {
     if (status === "loading") return;
     
     if (!session) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -153,6 +160,30 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error("Failed to delete user:", err);
       alert("An error occurred while deleting the user");
+    }
+  };
+
+  const handlePasswordReset = async (userId: string, newPassword: string) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to reset password");
+        return false;
+      }
+
+      alert("Password reset successfully");
+      return true;
+    } catch (err) {
+      console.error("Failed to reset password:", err);
+      alert("An error occurred while resetting the password");
+      return false;
     }
   };
 
@@ -351,6 +382,29 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedUserId(user.id);
+                          setShowAreaAssignment(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors"
+                        title="Assign Areas"
+                      >
+                        <MapPinIcon className="w-4 h-4" />
+                        Assign Areas
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedUserId(user.id);
+                          setSelectedUserName(user.name);
+                          setShowPasswordReset(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white font-semibold text-sm transition-colors"
+                        title="Reset Password"
+                      >
+                        <KeyIcon className="w-4 h-4" />
+                        Reset Password
+                      </button>
                       <select
                         value={user.role}
                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -376,6 +430,31 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* Area Assignment Modal */}
+        {showAreaAssignment && selectedUserId && (
+          <AreaAssignmentModal
+            userId={selectedUserId}
+            onClose={() => {
+              setShowAreaAssignment(false);
+              setSelectedUserId(null);
+            }}
+          />
+        )}
+
+        {/* Password Reset Modal */}
+        {showPasswordReset && selectedUserId && (
+          <PasswordResetModal
+            userId={selectedUserId}
+            userName={selectedUserName}
+            onClose={() => {
+              setShowPasswordReset(false);
+              setSelectedUserId(null);
+              setSelectedUserName("");
+            }}
+            onReset={handlePasswordReset}
+          />
+        )}
       </main>
     </>
   );
@@ -392,64 +471,71 @@ function CreateOvertimeForm({
   const [formData, setFormData] = useState({
     date: "",
     areaId: "",
-    shiftColourId: "",
+    areaShiftColourId: "",
     startTime: "07:00",
     endTime: "19:00",
     requiredPeople: "2",
   });
   const [areas, setAreas] = useState<Area[]>([]);
   const [shiftColours, setShiftColours] = useState<ShiftColour[]>([]);
-  const [filteredShiftColours, setFilteredShiftColours] = useState<ShiftColour[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [loadingShiftColours, setLoadingShiftColours] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const loadAreasAndShiftColours = async () => {
+    const loadAreas = async () => {
       try {
-        const [areasRes, shiftColoursRes] = await Promise.all([
-          fetch("/api/admin/areas"),
-          fetch("/api/admin/shift-colours"),
-        ]);
+        const areasRes = await fetch("/api/admin/areas");
 
-        if (!areasRes.ok || !shiftColoursRes.ok) {
-          setError("Failed to load areas or shift colours");
+        if (!areasRes.ok) {
+          setError("Failed to load areas");
           return;
         }
 
         const areasData = await areasRes.json();
-        const shiftColoursData = await shiftColoursRes.json();
-
         setAreas(areasData.filter((a: Area) => a.enabled));
-        setShiftColours(shiftColoursData);
       } catch {
-        setError("An error occurred while loading data");
+        setError("An error occurred while loading areas");
       } finally {
         setLoadingData(false);
       }
     };
 
-    loadAreasAndShiftColours();
+    loadAreas();
   }, []);
 
   useEffect(() => {
     if (formData.areaId) {
-      const filtered = shiftColours.filter(sc => sc.areaId === formData.areaId);
-      setFilteredShiftColours(filtered);
-      if (!filtered.find(sc => sc.id === formData.shiftColourId)) {
-        setFormData(prev => ({ ...prev, shiftColourId: "" }));
-      }
+      const loadShiftColoursForArea = async () => {
+        setLoadingShiftColours(true);
+        try {
+          const res = await fetch(`/api/areas/${formData.areaId}/shift-colours`);
+          if (!res.ok) {
+            setError("Failed to load shift colours for area");
+            return;
+          }
+          const data = await res.json();
+          setShiftColours(data.filter((sc: ShiftColour) => sc.enabled));
+        } catch {
+          setError("An error occurred while loading shift colours");
+        } finally {
+          setLoadingShiftColours(false);
+        }
+      };
+
+      loadShiftColoursForArea();
     } else {
-      setFilteredShiftColours([]);
-      setFormData(prev => ({ ...prev, shiftColourId: "" }));
+      setShiftColours([]);
+      setFormData(prev => ({ ...prev, areaShiftColourId: "" }));
     }
-  }, [formData.areaId, formData.shiftColourId, shiftColours]);
+  }, [formData.areaId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!formData.areaId || !formData.shiftColourId) {
+    if (!formData.areaId || !formData.areaShiftColourId) {
       setError("Please select both area and shift colour");
       return;
     }
@@ -481,7 +567,7 @@ function CreateOvertimeForm({
   if (loadingData) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-        <div className="text-center text-zinc-400 py-8">Loading areas and shift colours...</div>
+        <div className="text-center text-zinc-400 py-8">Loading areas...</div>
       </div>
     );
   }
@@ -552,25 +638,29 @@ function CreateOvertimeForm({
             <label className="block text-sm font-medium text-zinc-300 mb-3">
               🎨 Shift Colour
             </label>
-            {filteredShiftColours.length === 0 ? (
+            {loadingShiftColours ? (
+              <div className="text-sm text-zinc-400 py-2">
+                Loading shift colours...
+              </div>
+            ) : shiftColours.length === 0 ? (
               <div className="text-sm text-zinc-400 py-2">
                 No shift colours available for this area
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {filteredShiftColours.map((shiftColour) => (
+                {shiftColours.map((shiftColour) => (
                   <button
-                    key={shiftColour.id}
+                    key={shiftColour.areaShiftColourId}
                     type="button"
-                    onClick={() => setFormData({ ...formData, shiftColourId: shiftColour.id })}
+                    onClick={() => setFormData({ ...formData, areaShiftColourId: shiftColour.areaShiftColourId })}
                     className={`px-4 py-3 rounded-xl font-bold transition-all duration-200 ${
-                      formData.shiftColourId === shiftColour.id
+                      formData.areaShiftColourId === shiftColour.areaShiftColourId
                         ? "ring-4 ring-blue-500 scale-105 shadow-xl"
                         : "opacity-70 hover:opacity-100 hover:scale-105"
                     }`}
                     style={{
-                      backgroundColor: shiftColour.hexColour,
-                      color: parseInt(shiftColour.hexColour.slice(1), 16) > 0xffffff / 2 ? '#000' : '#fff'
+                      backgroundColor: shiftColour.hexColor,
+                      color: parseInt(shiftColour.hexColor.slice(1), 16) > 0xffffff / 2 ? '#000' : '#fff'
                     }}
                   >
                     {shiftColour.name}
@@ -774,6 +864,259 @@ function CreateUserForm({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// Area Assignment Modal Component
+function AreaAssignmentModal({
+  userId,
+  onClose,
+}: {
+  userId: string;
+  onClose: () => void;
+}) {
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // Fetch all areas
+        const areasRes = await fetch("/api/admin/areas");
+        if (!areasRes.ok) {
+          setError("Failed to load areas");
+          return;
+        }
+        const areasData = await areasRes.json();
+        setAreas(areasData.filter((a: Area) => a.enabled));
+
+        // Fetch user's current area assignments
+        const userAreasRes = await fetch(`/api/admin/users/${userId}/areas`);
+        if (userAreasRes.ok) {
+          const userAreasData = await userAreasRes.json();
+          setSelectedAreaIds(userAreasData.areaIds || []);
+        }
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setError("An error occurred while loading data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [userId]);
+
+  const handleToggleArea = (areaId: string) => {
+    setSelectedAreaIds((prev) => {
+      if (prev.includes(areaId)) {
+        return prev.filter((id) => id !== areaId);
+      } else {
+        return [...prev, areaId];
+      }
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/areas`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ areaIds: selectedAreaIds }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Failed to update area assignments");
+        return;
+      }
+
+      onClose();
+    } catch (err) {
+      console.error("Failed to save area assignments:", err);
+      setError("An error occurred while saving");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+        <h3 className="text-xl font-bold text-white mb-4">
+          Assign Areas to User
+        </h3>
+
+        {loading ? (
+          <div className="text-center text-zinc-400 py-8">Loading areas...</div>
+        ) : (
+          <>
+            <div className="space-y-2 mb-4">
+              {areas.length === 0 ? (
+                <div className="text-sm text-zinc-400 py-4">
+                  No areas available
+                </div>
+              ) : (
+                areas.map((area) => (
+                  <label
+                    key={area.id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800 hover:bg-zinc-750 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedAreaIds.includes(area.id)}
+                      onChange={() => handleToggleArea(area.id)}
+                      className="w-5 h-5 rounded border-zinc-600 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-white font-medium">{area.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+
+            {error && (
+              <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-sm mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 py-2 px-4 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-400 transition-colors"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={onClose}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg font-semibold text-white bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Password Reset Modal Component
+function PasswordResetModal({
+  userId,
+  userName,
+  onClose,
+  onReset,
+}: {
+  userId: string;
+  userName: string;
+  onClose: () => void;
+  onReset: (userId: string, password: string) => Promise<boolean>;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!password) {
+      setError("Password is required");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+    const success = await onReset(userId, password);
+    setLoading(false);
+
+    if (success) {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-900 rounded-lg p-6 max-w-md w-full border border-zinc-800">
+        <h2 className="text-xl font-bold text-white mb-4">
+          Reset Password for {userName}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900 bg-opacity-50 border border-red-700 text-red-200 px-4 py-2 rounded">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-semibold text-zinc-400 mb-2">
+              New Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter new password"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-zinc-400 mb-2">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Confirm new password"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 rounded-lg font-semibold text-white bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-800 transition-colors"
+            >
+              {loading ? "Resetting..." : "Reset Password"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg font-semibold text-white bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

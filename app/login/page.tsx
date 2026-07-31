@@ -1,11 +1,14 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+// Separate component that uses useSearchParams
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,17 +24,18 @@ export default function LoginPage() {
         email,
         password,
         redirect: false,
+        callbackUrl,
       });
 
       if (result?.error) {
         setError("Invalid email or password");
+        setLoading(false);
       } else if (result?.ok) {
-        router.push("/");
-        router.refresh();
+        // Use router.replace to avoid hard reload
+        router.replace(callbackUrl || "/overtime-dashboard");
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -98,5 +102,20 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center bg-zinc-950 p-4">
+          <div className="text-white">Loading...</div>
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

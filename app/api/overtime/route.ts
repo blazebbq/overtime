@@ -2,22 +2,53 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { wouldCreateBreach } from "@/lib/consecutive-days";
+import { autoArchiveOldOvertimePosts } from "@/lib/archiveUtils";
 
 export async function GET(req: NextRequest) {
   const { user, error } = await requireAuth();
   if (error) return error;
 
+  // Auto-archive overtime posts older than 5 days
+  try {
+    await autoArchiveOldOvertimePosts();
+  } catch (err) {
+    console.error("Auto-archive error:", err);
+    // Continue even if archiving fails
+  }
+
   const searchParams = req.nextUrl.searchParams;
   const areaId = searchParams.get("areaId");
+  const shiftColourId = searchParams.get("shiftColourId");
   const showAvailableOnly = searchParams.get("availableOnly") === "true";
   const showMyBookingsOnly = searchParams.get("myBookingsOnly") === "true";
+  const showMyApplicationsOnly = searchParams.get("myApplicationsOnly") === "true";
+  const showArchived = searchParams.get("showArchived") === "true";
+  
+  // NEW: Support for multiple area IDs
+  const areaIdsParam = searchParams.get("areaIds");
+  const areaIds = areaIdsParam ? JSON.parse(areaIdsParam) : null;
 
-  const where: any = {
+  const where: {
+    status?: { in: string[] };
+    archived?: boolean;
+    areaId?: string | { in: string[] };
+    shiftColourId?: string;
+  } = showArchived ? {
+    // When showing archived, include all statuses
+  } : {
     status: { in: ["OPEN", "FULL"] },
+    archived: false,
   };
 
-  if (areaId) {
+  // Use multiple areaIds if provided, otherwise single areaId
+  if (areaIds && Array.isArray(areaIds) && areaIds.length > 0) {
+    where.areaId = { in: areaIds };
+  } else if (areaId) {
     where.areaId = areaId;
+  }
+
+  if (shiftColourId) {
+    where.shiftColourId = shiftColourId;
   }
 
   let overtime = await prisma.overtimeRequest.findMany({
@@ -31,149 +62,119 @@ export async function GET(req: NextRequest) {
           user: { select: { id: true, name: true, email: true } },
         },
       },
+      applications: {
+        where: user ? {
+          OR: [
+            { status: "APPROVED" },
+            { userId: user.id } // Include current user's application regardless of status
+          ]
+        } : {
+          status: "APPROVED"
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
     },
   });
 
-  // Apply filters
+  // Transform data to include userApplication separately and accepted workers
+  const overtimeWithUserApp = await Promise.all(overtime.map(async (ot) => {
+    const userApplication = user 
+      ? ot.applications.find(app => app.userId === user.id)
+      : undefined;
+    
+    const approvedApps = ot.applications.filter(app => app.status === "APPROVED");
+    
+    // Check if there are any CANCEL_PENDING applications for this overtime
+    const cancellationPendingCount = await prisma.overtimeApplication.count({
+      where: {
+        overtimeId: ot.id,
+        status: "CANCEL_PENDING",
+      },
+    });
+    
+    // For pending or cancellation pending applications, find assigned manager
+    let assignedManager = null;
+    if (userApplication && (userApplication.status === "PENDING_APPROVAL" || userApplication.status === "CANCEL_PENDING") && user) {
+      const managerAssignment = await prisma.managerAssignment.findFirst({
+        where: {
+          userId: user.id,
+          OR: [
+            { areaId: null },
+            { areaId: ot.areaId },
+          ],
+        },
+        include: {
+          manager: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          // Prefer specific area assignments over global ones
+          areaId: "desc",
+        },
+      });
+      
+      assignedManager = managerAssignment?.manager || null;
+    }
+    
+    return {
+      ...ot,
+      userApplication: userApplication ? {
+        id: userApplication.id,
+        status: userApplication.status,
+        assignedManager,
+        cancellationRequestedReason: userApplication.cancellationRequestedReason,
+        cancellationRequestedAt: userApplication.cancellationRequestedAt,
+        user: userApplication.user ? { name: userApplication.user.name } : undefined,
+      } : undefined,
+      // Keep applications as approved only for display
+      applications: approvedApps,
+      // Add accepted workers names for display on cards
+      acceptedWorkers: approvedApps.map(app => ({
+        name: app.user.name,
+      })),
+      // Add flag to indicate if there are pending cancellations
+      hasCancellationPending: cancellationPendingCount > 0,
+    };
+  }));
+
+  // Apply filters based on approvedCount (new model)
+  let filteredOvertime = overtimeWithUserApp;
+  
   if (showAvailableOnly) {
-    overtime = overtime.filter((ot) => ot.bookings.length < ot.requiredPeople);
+    filteredOvertime = filteredOvertime.filter((ot) => ot.approvedCount < ot.requiredPeople);
   }
 
   if (showMyBookingsOnly && user) {
-    overtime = overtime.filter((ot) =>
+    filteredOvertime = filteredOvertime.filter((ot) =>
       ot.bookings.some((b) => b.userId === user.id)
     );
   }
 
-  return NextResponse.json(overtime);
-}
-
-export async function POST(req: Request) {
-  const { user, error } = await requireAuth();
-  if (error) return error;
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { overtimeId } = await req.json();
-
-  const overtime = await prisma.overtimeRequest.findUnique({
-    where: { id: overtimeId },
-    include: { bookings: true },
-  });
-
-  if (!overtime) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // 1️⃣ CHECK IF USER ALREADY BOOKED
-  const existingBooking = await prisma.booking.findUnique({
-    where: {
-      userId_overtimeId: {
-        userId: user.id,
-        overtimeId,
-      },
-    },
-  });
-
-  // 2️⃣ CANCEL IS ALWAYS ALLOWED (EVEN IF FULL)
-  if (existingBooking) {
-    await prisma.booking.delete({
-      where: { id: existingBooking.id },
-    });
-
-    const remaining = await prisma.booking.count({
-      where: { overtimeId },
-    });
-
-    await prisma.overtimeRequest.update({
-      where: { id: overtimeId },
-      data: {
-        status:
-          remaining >= overtime.requiredPeople ? "FULL" : "OPEN",
-      },
-    });
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        action: "BOOKING_CANCELLED",
-        entityType: "Booking",
-        entityId: existingBooking.id,
-        creatorId: user.id,
-        affectedUserId: user.id,
-        changes: JSON.stringify({ overtimeId }),
-      },
-    });
-
-    return NextResponse.json({ ok: true, action: "cancelled" });
-  }
-
-  // 3️⃣ BLOCK ONLY NEW BOOKINGS IF FULL
-  const currentCount = overtime.bookings.length;
-
-  if (currentCount >= overtime.requiredPeople) {
-    await prisma.overtimeRequest.update({
-      where: { id: overtimeId },
-      data: { status: "FULL" },
-    });
-
-    return NextResponse.json(
-      { error: "Shift is full" },
-      { status: 400 }
+  if (showMyApplicationsOnly && user) {
+    filteredOvertime = filteredOvertime.filter((ot) =>
+      ot.applications.some((app) => app.userId === user.id)
     );
   }
 
-  // 4️⃣ CHECK FOR CONSECUTIVE DAY BREACH (warning only, not blocking)
-  let breachWarning = false;
-  let consecutiveDays = 0;
-  try {
-    const breachCheck = await wouldCreateBreach(user.id, overtime.date);
-    breachWarning = breachCheck.wouldBreach;
-    consecutiveDays = breachCheck.consecutiveDaysAfter;
-  } catch (err) {
-    console.error("Failed to check consecutive days:", err);
-    // Continue with booking even if check fails
-  }
+  return NextResponse.json(filteredOvertime);
+}
 
-  // 5️⃣ CREATE BOOKING
-  const booking = await prisma.booking.create({
-    data: {
-      userId: user.id,
-      overtimeId,
+export async function POST(req: Request) {
+  // DISABLED: Direct booking is no longer allowed.
+  // All overtime must go through the application → approval flow.
+  // Use /api/applications instead.
+  
+  return NextResponse.json(
+    { 
+      error: "Direct booking is disabled. Please apply through the application system.",
+      redirect: "/dashboard/available"
     },
-  });
-
-  const newCount = currentCount + 1;
-
-  await prisma.overtimeRequest.update({
-    where: { id: overtimeId },
-    data: {
-      status:
-        newCount >= overtime.requiredPeople ? "FULL" : "OPEN",
-    },
-  });
-
-  // Create audit log
-  await prisma.auditLog.create({
-    data: {
-      action: "BOOKING_CREATED",
-      entityType: "Booking",
-      entityId: booking.id,
-      creatorId: user.id,
-      affectedUserId: user.id,
-      changes: JSON.stringify({ 
-        overtimeId, 
-        breachWarning, 
-        consecutiveDays 
-      }),
-    },
-  });
-
-  return NextResponse.json({ 
-    ok: true, 
-    action: "booked",
-    breachWarning,
-    consecutiveDays,
-  });
+    { status: 403 }
+  );
 }

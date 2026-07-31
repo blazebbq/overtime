@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
 // Update user role
 export async function PATCH(
@@ -48,6 +49,56 @@ export async function PATCH(
     console.error("Error updating user:", err);
     return NextResponse.json(
       { error: "Failed to update user" },
+      { status: 500 }
+    );
+  }
+}
+
+// Reset user password
+export async function PUT(
+  req: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { user, error } = await requireAdmin();
+  if (error) return error;
+
+  const params = await context.params;
+
+  try {
+    const body = await req.json();
+    const { password } = body;
+
+    if (!password) {
+      return NextResponse.json(
+        { error: "Password is required" },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: "Password must be at least 6 characters" },
+        { status: 400 }
+      );
+    }
+
+    // Hash the new password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Update user's password
+    await prisma.user.update({
+      where: { id: params.id },
+      data: { password: passwordHash },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (err) {
+    console.error("Error resetting password:", err);
+    return NextResponse.json(
+      { error: "Failed to reset password" },
       { status: 500 }
     );
   }
