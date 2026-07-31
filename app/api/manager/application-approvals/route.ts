@@ -6,6 +6,16 @@ import { resolveInboxItems } from "@/lib/inbox";
 import { calculatePaySegments, parseDateTime } from "@/lib/payCalculation";
 import { createUserNotification } from "@/lib/userNotifications";
 
+type AutoRejectedApplication = {
+  id: string;
+  userId: string;
+  user: {
+    name: string;
+    email: string;
+    secondaryEmail: string | null;
+  };
+};
+
 // GET - List applications needing approval
 export async function GET(req: NextRequest) {
   const { user, error } = await requireManager();
@@ -240,6 +250,8 @@ export async function POST(req: Request) {
 
       // Use transaction to ensure atomicity
       const result = await prisma.$transaction(async (tx) => {
+        let autoRejectedApplications: AutoRejectedApplication[] = [];
+
         // Update application
         const updatedApp = await tx.overtimeApplication.update({
           where: { id: applicationId },
@@ -298,7 +310,7 @@ export async function POST(req: Request) {
         // If we've reached capacity, auto-reject all remaining pending applications
         if (updatedOvertime.approvedCount >= updatedOvertime.requiredPeople) {
           // Find all pending applications for this overtime
-          const pendingApplications = await tx.overtimeApplication.findMany({
+          autoRejectedApplications = await tx.overtimeApplication.findMany({
             where: {
               overtimeId: application.overtimeId,
               status: "PENDING_APPROVAL",
@@ -325,35 +337,8 @@ export async function POST(req: Request) {
             },
           });
 
-          // Send rejection emails to all auto-rejected applicants
-          for (const pendingApp of pendingApplications) {
-            await sendApplicationStatusEmail(
-              {
-                primary: pendingApp.user.email,
-                secondary: pendingApp.user.secondaryEmail,
-              },
-              pendingApp.user.name,
-              "REJECTED_CAPACITY",
-              {
-                date: new Date(application.overtime.date).toDateString(),
-                area: application.overtime.area.name,
-                shiftColour: application.overtime.shiftColour.name,
-                shiftHexColor: application.overtime.shiftColour.hexColor,
-              }
-            );
-
-            // Create user notification for auto-rejection
-            await createUserNotification(
-              pendingApp.userId,
-              "AUTO_REJECTED",
-              pendingApp.id,
-              application.overtimeId,
-              `Your overtime application has been auto-rejected for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}) because capacity was reached.`
-            );
-          }
-
           // Create audit logs for auto-rejections
-          for (const pendingApp of pendingApplications) {
+          for (const pendingApp of autoRejectedApplications) {
             await tx.auditLog.create({
               data: {
                 action: "APPLICATION_AUTO_REJECTED",
@@ -386,8 +371,38 @@ export async function POST(req: Request) {
           },
         });
 
-        return updatedApp;
+        return { updatedApp, autoRejectedApplications };
       });
+
+      await Promise.allSettled(
+        result.autoRejectedApplications.map(async (pendingApp) => {
+          await sendApplicationStatusEmail(
+            {
+              primary: pendingApp.user.email,
+              secondary: pendingApp.user.secondaryEmail,
+            },
+            pendingApp.user.name,
+            "REJECTED_CAPACITY",
+            {
+              date: new Date(application.overtime.date).toDateString(),
+              area: application.overtime.area.name,
+              shiftColour: application.overtime.shiftColour.name,
+              shiftHexColor: application.overtime.shiftColour.hexColor,
+            },
+            pendingApp.id
+          );
+
+          await createUserNotification(
+            pendingApp.userId,
+            "AUTO_REJECTED",
+            pendingApp.id,
+            application.overtimeId,
+            `Your overtime application has been auto-rejected for ${new Date(application.overtime.date).toDateString()} (${application.overtime.area.name} - ${application.overtime.shiftColour.name}) because capacity was reached.`
+          );
+
+          await resolveInboxItems(pendingApp.id, user!.id);
+        })
+      );
 
       // Send approval email
       await sendApplicationStatusEmail(
@@ -419,7 +434,7 @@ export async function POST(req: Request) {
       // Resolve inbox items for this application
       await resolveInboxItems(applicationId, user!.id);
 
-      return NextResponse.json(result);
+      return NextResponse.json(result.updatedApp);
     } else {
       // REJECT action
       if (!rejectionReason) {
